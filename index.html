@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      (function() {
+        function isViteProxyWebSocketRejection(reason) {
+          if (!reason) return false;
+          try {
+            var message = typeof reason === 'string'
+              ? reason
+              : (typeof reason.message === 'string' ? reason.message : '');
+            var stack = typeof reason.stack === 'string' ? reason.stack : '';
+
+            if (message.indexOf('WebSocket closed without opened') !== -1) {
+              return true;
+            }
+            if (
+              stack.indexOf('@vite/client') !== -1 &&
+              (message.indexOf('WebSocket') !== -1 || message.indexOf('websocket') !== -1)
+            ) {
+              return true;
+            }
+          } catch (_) {
+            return false;
+          }
+          return false;
+        }
+
+        window.addEventListener('unhandledrejection', function(event) {
+          if (event && isViteProxyWebSocketRejection(event.reason)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+          }
+        }, true);
+
+        var OriginalWebSocket = window.WebSocket;
+        if (typeof OriginalWebSocket === 'function') {
+          window.WebSocket = function(url, protocols) {
+            var isViteHmrProtocol =
+              protocols === 'vite-hmr' ||
+              (Array.isArray(protocols) && protocols.indexOf('vite-hmr') !== -1);
+            var isViteHmrUrl =
+              typeof url === 'string' &&
+              (url.indexOf('/@vite/') !== -1 || url.indexOf('vite-hmr') !== -1);
+
+            if (isViteHmrProtocol || isViteHmrUrl) {
+              // Return a silent dummy WebSocket for Vite HMR so @vite/client never throws in Cloud Run
+              return {
+                url: typeof url === 'string' ? url : '',
+                protocol: 'vite-hmr',
+                readyState: 3,
+                 bufferedAmount: 0,
+                extensions: '',
+                binaryType: 'blob',
+                send: function() {},
+                close: function() {},
+                addEventListener: function() {},
+                removeEventListener: function() {},
+                dispatchEvent: function() { return false; }
+              };
+            }
+            return arguments.length > 1
+              ? new OriginalWebSocket(url, protocols)
+              : new OriginalWebSocket(url);
+          };
+          window.WebSocket.prototype = OriginalWebSocket.prototype;
+          window.WebSocket.CONNECTING = OriginalWebSocket.CONNECTING;
+          window.WebSocket.OPEN = OriginalWebSocket.OPEN;
+          window.WebSocket.CLOSING = OriginalWebSocket.CLOSING;
+          window.WebSocket.CLOSED = OriginalWebSocket.CLOSED;
+        }
+
+        // Purge legacy Service Worker caches that stored stale Vite pre-bundled chunks with mismatched ?v= hashes
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            for (var i = 0; i < names.length; i++) {
+              if (names[i] !== 'sentinel-pwa-v3') {
+                caches.delete(names[i]);
+              }
+            }
+          }).catch(function() {});
+        }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for (var i = 0; i < registrations.length; i++) {
+              registrations[i].update().catch(function() {});
+            }
+          }).catch(function() {});
+        }
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Sentinel Crypto Node</title>
+
+    <!-- Primary Meta Tags -->
+    <meta name="description" content="Real-time HFT Bitcoin risk monitoring system and flash-crash early-warning alert engine with live Binance WebSocket radar, Buy & Sell Signal Scanners, Cryptomus payment gateway, and configurable Telegram threshold rules." />
+    <meta property="og:title" content="Sentinel Crypto Node" />
+    <meta property="og:description" content="Real-time HFT Bitcoin risk monitoring system and flash-crash early-warning alert engine with live Binance WebSocket radar, Buy & Sell Signal Scanners, Cryptomus payment gateway, and configurable Telegram threshold rules." />
+    <meta name="theme-color" content="#0B0E11" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Web App Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- iOS / Apple Mobile Web App -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Sentinel" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+
+    <!-- Favicons & App Icons -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+
+    <!-- Main Tailwind & Theme Stylesheet -->
+    <link rel="stylesheet" href="/src/index.css" />
+  </head>
+  <body class="bg-[#0B0E11] text-[#EAECEF] antialiased">
+    <div id="root"></div>
+    <script type="module">
+      (async function bootApp() {
+        try {
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map((name) => caches.delete(name)));
+          }
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map((reg) => reg.unregister()));
+          }
+        } catch (_) {
+          // Ignore cleanup errors and continue boot
+        }
+        await import('/src/main.tsx');
+      })();
+    </script>
+  </body>
+</html>
+

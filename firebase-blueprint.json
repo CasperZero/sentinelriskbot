@@ -1,0 +1,33 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profiles",
+      "description": "User profile with subscription tier and access control status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "subscription_tier": { "type": "string", "enum": ["free", "pro", "premium"] },
+        "subscription_expires_at": { "type": ["number", "string"] },
+        "payment_status": { "type": "string", "enum": ["active", "inactive", "expired"] },
+        "created_at": { "type": "string" },
+        "telegram_chat_id": { "type": "string" },
+        "telegram_username": { "type": "string" },
+        "telegram_linked_at": { "type": "string" },
+        "is_telegram_linked": { "type": "boolean" },
+        "tracked_symbols": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Specific cryptocurrency trading pairs selected by the user for Telegram alerts"
+        },
+        "language_preference": {
+          "type": "string",
+          "enum": ["es", "en"],
+          "description": "Preferred language for Telegram alerts and UI"
+        }
+      },
+      "required": ["id", "email", "subscription_tier"]
+    }
+  }
+}

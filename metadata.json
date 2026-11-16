@@ -1,0 +1,6 @@
+{
+  "name": "Sentinel Crypto Node",
+  "description": "Real-time HFT Bitcoin risk monitoring system and flash-crash early-warning alert engine with live Binance WebSocket radar, Buy & Sell Signal Scanners, Cryptomus payment gateway, and configurable Telegram threshold rules.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
