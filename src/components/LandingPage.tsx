@@ -82,7 +82,7 @@ const LANDING_COPY = {
         num: "01.",
         title: "24/7 Private Telegram Alert Bot",
         description:
-          "Instant Buy, Take-Profit, and Emergency Breakdown notifications sent straight to your phone via @SentinelRiskBot\_bot without needing to keep a browser tab open.",
+          "Instant Buy, Take-Profit, and Emergency Breakdown notifications sent straight to your phone via [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot) without needing to keep a browser tab open.",
         highlight:
           "Sub-second webhook & mobile push delivery · English & Spanish support",
         span: "lg:col-span-2",
@@ -239,7 +239,7 @@ const LANDING_COPY = {
         num: "01.",
         title: "Bot Privado de Alertas 24/7 en Telegram",
         description:
-          "Notificaciones instantáneas de Compra, Toma de Ganancias y Evacuación enviadas directo a tu celular mediante @SentinelRiskBot\_bot sin necesidad de mantener el navegador abierto.",
+          "Notificaciones instantáneas de Compra, Toma de Ganancias y Evacuación enviadas directo a tu celular mediante [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot) sin necesidad de mantener el navegador abierto.",
         highlight:
           "Entrega móvil en menos de un segundo · Soporte en Español e Inglés",
         span: "lg:col-span-2",

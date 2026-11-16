@@ -1609,7 +1609,7 @@ export const translations: Record<Language, Translations> = {
     telegramWebhookProTitle:
       "Telegram & Webhook Alert Dispatcher (PRO Exclusive)",
     telegramWebhookProDesc:
-      "Instant sub-second Telegram Bot notifications (@SentinelRiskBot\_bot) and automated JSON HTTP webhooks are exclusive to PRO subscribers.",
+      "Instant sub-second Telegram Bot notifications [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot) and automated JSON HTTP webhooks are exclusive to PRO subscribers.",
     unlockTelegramWebhookBtn: "UNLOCK TELEGRAM & WEBHOOK DISPATCHER ($29)",
     webhookDispatchDesc:
       "Dispatches a JSON POST payload whenever the Composite Risk Index breaches configured thresholds.",
@@ -2537,7 +2537,7 @@ export const translations: Record<Language, Translations> = {
     manageCryptosPlusMinus: "Gestionar Criptos (+/-)",
     telegramWebhookProTitle: "Alertas Telegram y Webhooks (Exclusivo PRO)",
     telegramWebhookProDesc:
-      "El despacho de alertas automáticas vía Telegram Bot (@SentinelRiskBot\_bot) y Webhooks HTTP de ultra baja latencia está disponible exclusivamente para cuentas Premium.",
+      "El despacho de alertas automáticas vía Telegram Bot [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot) y Webhooks HTTP de ultra baja latencia está disponible exclusivamente para cuentas Premium.",
     unlockTelegramWebhookBtn: "DESBLOQUEAR TELEGRAM & WEBHOOKS ($29)",
     webhookDispatchDesc:
       "Enviará un payload JSON POST cuando el Risk Index supere el umbral configurado.",
