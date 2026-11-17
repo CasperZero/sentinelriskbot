@@ -82,7 +82,7 @@ const LANDING_COPY = {
         num: "01.",
         title: "24/7 Private Telegram Alert Bot",
         description:
-          "Instant Buy, Take-Profit, and Emergency Breakdown notifications sent straight to your phone via [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot) without needing to keep a browser tab open.",
+          "Instant Buy, Take-Profit, and Emergency Breakdown notifications sent straight to your phone via @SentinelRiskBot_bot without needing to keep a browser tab open.",
         highlight:
           "Sub-second webhook & mobile push delivery · English & Spanish support",
         span: "lg:col-span-2",
@@ -239,7 +239,7 @@ const LANDING_COPY = {
         num: "01.",
         title: "Bot Privado de Alertas 24/7 en Telegram",
         description:
-          "Notificaciones instantáneas de Compra, Toma de Ganancias y Evacuación enviadas directo a tu celular mediante [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot) sin necesidad de mantener el navegador abierto.",
+          "Notificaciones instantáneas de Compra, Toma de Ganancias y Evacuación enviadas directo a tu celular mediante @SentinelRiskBot_bot sin necesidad de mantener el navegador abierto.",
         highlight:
           "Entrega móvil en menos de un segundo · Soporte en Español e Inglés",
         span: "lg:col-span-2",
@@ -350,6 +350,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const { language, setLanguage } = useLanguage();
   const [activeLegalDoc, setActiveLegalDoc] = useState<LegalDocType>(null);
 
+  const lang = language;
   const isEs = language === "es";
   const copy = isEs ? LANDING_COPY.es : LANDING_COPY.en;
 
@@ -751,6 +752,40 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <p className="text-sm sm:text-base text-[#848E9C]">
                 {copy.pricingSubtitle}
               </p>
+            </div>
+
+            <div className="max-w-5xl mx-auto">
+              <div className="bg-gray-900/80 border border-blue-500/30 rounded-xl p-5 mb-6 shadow-lg backdrop-blur-md">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-blue-500/10 rounded-lg text-blue-400 text-2xl">
+                    📢
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-white font-semibold text-lg mb-1">
+                      {lang === "es"
+                        ? "Canal Público de Alertas (FOMO)"
+                        : "Public Free Alerts Channel"}
+                    </h3>
+                    <p className="text-gray-400 text-sm mb-4">
+                      {lang === "es"
+                        ? "¿Aún no eres PRO? Únete a nuestro canal público en Telegram para ver las alertas en tiempo real y comprobar la efectividad del escáner."
+                        : "Not PRO yet? Join our public Telegram channel to see real-time alerts and test the scanner effectiveness."}
+                    </p>
+                    <a
+                      href="https://t.me/SentinelFreeAlerts"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors shadow-md"
+                    >
+                      <span>
+                        {lang === "es"
+                          ? "Unirse al Canal Gratuito"
+                          : "Join Free Channel"}
+                      </span>
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-5xl mx-auto items-stretch">

@@ -936,9 +936,9 @@ async function startServer() {
 
         // 1. Calculate nearestBuyWallPrice: largest single bid volume within 5% distance below currentPrice
         const bidsWithin5Pct = bids.filter(
-          (b) => b.price >= currentPrice * 0.95 && b.price <= currentPrice,
+          (b: any) => b.price >= currentPrice * 0.95 && b.price <= currentPrice,
         );
-        bidsWithin5Pct.sort((a, b) => b.quantity - a.quantity);
+        bidsWithin5Pct.sort((a: any, b: any) => b.quantity - a.quantity);
 
         let wallPrice = 0;
         let wallQty = 0;
@@ -948,7 +948,7 @@ async function startServer() {
           wallQty = bidsWithin5Pct[0].quantity;
         } else if (bids.length > 0) {
           const topBids = [...bids.slice(0, 20)].sort(
-            (a, b) => b.quantity - a.quantity,
+            (a: any, b: any) => b.quantity - a.quantity,
           );
           wallPrice = topBids[0].price;
           wallQty = topBids[0].quantity;
@@ -2624,8 +2624,7 @@ async function startServer() {
 
     if (sendTelegramNotice && chatId && chatId.trim() !== "") {
       const appUrl =
-        process.env.PUBLIC_APP_URL ||
-        "https://www.sentinelriskbot.com](https://www.sentinelriskbot.com";
+        process.env.PUBLIC_APP_URL || "https://www.sentinelriskbot.com";
       const expirationMsg =
         langPref === "en"
           ? `⚠️ *SENTINEL PRO — SUBSCRIPTION EXPIRED*\n━━━━━━━━━━━━━━━━━━━━\nYour 30-day *Sentinel PRO* access pass has expired, and your account has been switched back to the *Free* tier.\n\n🔒 *Paused PRO Features:*\n• 24/7 Private Telegram Buy, Take-Profit & Breakdown Alerts\n• Institutional ATR Execution Plans (Entry, TP1/TP2, Max 4% SL)\n• Custom Multi-Asset Watchlist Filtering\n\n⚡ Renew your 30-day PRO pass anytime to restore instant 24/7 protection:\n👉 [Renew Sentinel PRO ($29/mo)](${appUrl})`
@@ -2837,8 +2836,8 @@ async function startServer() {
           const expDateStr = new Date(expiresAtMs).toISOString().split("T")[0];
           const welcomeMsg =
             langPref === "en"
-              ? `🚀 *SENTINEL PRO ACTIVATED!*\n━━━━━━━━━━━━━━━━━━━━\n✅ Your crypto payment has been verified and your *Sentinel PRO* membership is now *ACTIVE*.\n\n🛡️ *Unlocked 24/7 Capabilities:*\n• Private 24/7 Buy, Take-Profit & Evacuation Alerts\n• Institutional ATR Execution Plans (Entry, TP1/TP2, Max 4% SL)\n• Global Flash Crash Shield & Breakdown Warnings\n• Custom Spot & Futures Watchlist Filtering\n\n📅 *Active Until:* \`${expDateStr}\`\n🤖 _Thank you for trading safely with @${TELEGRAM_BOT_USERNAME}_`
-              : `🚀 *¡BIENVENIDO A SENTINEL PRO!*\n━━━━━━━━━━━━━━━━━━━━\n✅ Tu pago en cripto ha sido verificado y tu membresía *Sentinel PRO* ya está *ACTIVA*.\n\n🛡️ *Beneficios Desbloqueados 24/7:*\n• Bot Privado de Alertas 24/7 (Compra, Take-Profit y Evacuación)\n• Planes Institucionales ATR (Entrada, TP1/TP2 y Stop Loss máx 4%)\n• Escudo Global Anti-Crash y Alertas de Ruptura Bajista\n• Lista Personalizada Spot & Futuros con Filtro Anti-Spam\n\n📅 *Activo Hasta:* \`${expDateStr}\`\n🤖 _Gracias por proteger tu capital con @${TELEGRAM_BOT_USERNAME}_`;
+              ? `🚀 *SENTINEL PRO ACTIVATED!*\n━━━━━━━━━━━━━━━━━━━━\n✅ Your crypto payment has been verified and your *Sentinel PRO* membership is now *ACTIVE*.\n\n🛡️ *Unlocked 24/7 Capabilities:*\n• Private 24/7 Buy, Take-Profit & Evacuation Alerts\n• Institutional ATR Execution Plans (Entry, TP1/TP2, Max 4% SL)\n• Global Flash Crash Shield & Breakdown Warnings\n• Custom Spot & Futures Watchlist Filtering\n\n📅 *Active Until:* \`${expDateStr}\`\n🤖 _Thank you for trading safely with_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`
+              : `🚀 *¡BIENVENIDO A SENTINEL PRO!*\n━━━━━━━━━━━━━━━━━━━━\n✅ Tu pago en cripto ha sido verificado y tu membresía *Sentinel PRO* ya está *ACTIVA*.\n\n🛡️ *Beneficios Desbloqueados 24/7:*\n• Bot Privado de Alertas 24/7 (Compra, Take-Profit y Evacuación)\n• Planes Institucionales ATR (Entrada, TP1/TP2 y Stop Loss máx 4%)\n• Escudo Global Anti-Crash y Alertas de Ruptura Bajista\n• Lista Personalizada Spot & Futuros con Filtro Anti-Spam\n\n📅 *Activo Hasta:* \`${expDateStr}\`\n🤖 _Gracias por proteger tu capital con_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
 
           await sendTelegramMessage(chatId, welcomeMsg);
           console.log(
@@ -3390,7 +3389,7 @@ async function startServer() {
 • *Ratio Riesgo/Beneficio:* \`1 : ${rr}\`
 
 💡 _${signal.rationaleEs || "Presión de venta agotada. Los compradores institucionales absorben la caída."}_
-🤖 _Bot Sentinel 24/7: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Bot Sentinel 24/7:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     } else {
       return `🟢 *SENTINEL • INSTITUTIONAL BUY ALERT (24/7)*
 ━━━━━━━━━━━━━━━━━━━━
@@ -3410,7 +3409,7 @@ async function startServer() {
 • *Risk/Reward Ratio:* \`1 : ${rr}\`
 
 💡 _${signal.rationaleEn || "Selling pressure exhausted. Buyers absorbing dip near support floor."}_
-🤖 _Sentinel 24/7 Bot: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Sentinel 24/7 Bot:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     }
   }
 
@@ -3456,7 +3455,7 @@ async function startServer() {
 • *Ratio Riesgo/Beneficio:* \`1 : ${rr}\`
 
 💡 _${signal.rationaleEs || "Presión compradora agotada. Los vendedores institucionales frenan la subida en el techo de resistencia."}_
-🤖 _Bot Sentinel 24/7: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Bot Sentinel 24/7:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     } else {
       return `🔴 *SENTINEL • INSTITUTIONAL SELL / TAKE PROFIT ALERT (24/7)*
 ━━━━━━━━━━━━━━━━━━━━
@@ -3476,7 +3475,7 @@ async function startServer() {
 • *Risk/Reward Ratio:* \`1 : ${rr}\`
 
 💡 _${signal.rationaleEn || "Buying momentum exhausted. Institutional sellers capping advance near resistance."}_
-🤖 _Sentinel 24/7 Bot: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Sentinel 24/7 Bot:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     }
   }
 
@@ -3527,7 +3526,7 @@ async function startServer() {
 • *Objetivo 1 (TP1):* \`$${tp1}\`
 • *Ratio R:R:* \`1 : ${rr}\`
 
-🤖 _Bot Sentinel 24/7: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Bot Sentinel 24/7:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     } else {
       return `⚡ *SENTINEL • TREND CONFLUENCE ALERT (24/7)*
 ━━━━━━━━━━━━━━━━━━━━
@@ -3546,66 +3545,30 @@ async function startServer() {
 • *Target 1 (TP1):* \`$${tp1}\`
 • *Risk/Reward:* \`1 : ${rr}\`
 
-🤖 _Sentinel 24/7 Bot: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Sentinel 24/7 Bot:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     }
   }
 
   function buildTeaserAlertMarkdown(
-    type: "BUY" | "SELL" | "VWAP",
+    _type: "BUY" | "SELL" | "VWAP",
     signal: any,
-    isEs: boolean = true,
+    _isEs: boolean = true,
   ): string {
     const symbol = signal.symbol;
     const price = formatCryptoPrice(signal.currentPrice, signal.currentPrice);
-    const score = signal.opportunityScore || signal.trendScore || 85;
-    const mfi = signal.mfi || 50;
-    const appUrl =
-      process.env.PUBLIC_APP_URL ||
-      "https://www.sentinelriskbot.com](https://www.sentinelriskbot.com";
+    const publicMessage = `⚡ **SENTINEL ALGO ALERT** ⚡
 
-    if (type === "BUY") {
-      return `⚡ *SENTINEL ALGO ALERT • SEÑAL DETECTADA (CANAL PÚBLICO)*
-━━━━━━━━━━━━━━━━━━━━
-🎯 *Activo:* \`${symbol}\` | *Precio:* \`$${price}\`
-⚡ *Puntuación Algorítmica:* \`${score}/100\` (Alta Probabilidad)
-📊 *MFI (14):* \`${mfi}\` (Sobreventa Reversible)
+🎯 Activo / Asset: ${symbol} | Precio / Price: $${price}
 
-🎯 *Zona de Entrada:* 🔒 [Exclusivo Miembros PRO]
-🛡️ *Stop Loss (ATR):* 🔒 [Exclusivo Miembros PRO]
-💰 *Take Profit 1 & 2:* 🔒 [Exclusivo Miembros PRO]
+[ES] 🔒 Zona de Entrada, Stop Loss y Take Profit exclusivos para miembros PRO.
+[EN] 🔒 Entry Zone, Stop Loss, and Take Profit exclusive for PRO members.
 
-🚀 _Desbloquea los niveles de ejecución exactos en tiempo real y recibe alertas instantáneas en tu Telegram privado:_
-👉 [Acceder a Sentinel PRO](${appUrl})
+🚀 Protege tu capital / Protect your capital:
+👉 [Acceder a Sentinel PRO / Get PRO](https://www.sentinelriskbot.com)
 
-🤖 _Bot Oficial: @${TELEGRAM_BOT_USERNAME}_`;
-    } else if (type === "SELL") {
-      return `⚡ *SENTINEL ALGO ALERT • TECHO DE MERCADO (CANAL PÚBLICO)*
-━━━━━━━━━━━━━━━━━━━━
-🎯 *Activo:* \`${symbol}\` | *Precio:* \`$${price}\`
-⚡ *Puntuación de Distribución:* \`${score}/100\` (Resistencia Cuantitativa)
-📊 *MFI (14):* \`${mfi}\` (Sobrecompra Extrema)
+🤖 Bot Oficial: [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
 
-🎯 *Zona de Entrada Short:* 🔒 [Exclusivo Miembros PRO]
-🛡️ *Stop Loss (ATR):* 🔒 [Exclusivo Miembros PRO]
-💰 *Take Profit 1 & 2:* 🔒 [Exclusivo Miembros PRO]
-
-🚀 _Protege tu capital y desbloquea salidas automáticas en tiempo real:_
-👉 [Acceder a Sentinel PRO](${appUrl})
-
-🤖 _Bot Oficial: @${TELEGRAM_BOT_USERNAME}_`;
-    } else {
-      return `⚡ *SENTINEL ALGO ALERT • CONFLUENCIA VWAP (CANAL PÚBLICO)*
-━━━━━━━━━━━━━━━━━━━━
-🎯 *Activo:* \`${symbol}\` | *Precio:* \`$${price}\`
-📈 *Dirección de Tendencia:* \`${signal.signalType === "BUY" ? "ALCISTA" : "BAJISTA"}\` (\`${score}/100\`)
-
-🎯 *Zona de Entrada:* 🔒 [Exclusivo Miembros PRO]
-🛡️ *Stop Loss:* 🔒 [Exclusivo Miembros PRO]
-💰 *Take Profit 1:* 🔒 [Exclusivo Miembros PRO]
-
-👉 [Acceder a Sentinel PRO](${appUrl})
-🤖 _Bot Oficial: @${TELEGRAM_BOT_USERNAME}_`;
-    }
+    return publicMessage;
   }
 
   function buildCrashAlertMarkdown(
@@ -3621,7 +3584,7 @@ async function startServer() {
 • Reduzca apalancamiento inmediatamente
 • Ajuste Stop Loss al precio de entrada o soporte clave
 • Evite intentar comprar rebotes prematuros
-🤖 _Bot Sentinel 24/7: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Bot Sentinel 24/7:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     } else {
       return `🚨 *FLASH CRASH WARNING:* Global market risk is critical (Index: \`${riskIndex}/100\`). Heavy selling pressure detected. Buy signals are currently locked. Protect your capital and tighten Stop Losses.
 ━━━━━━━━━━━━━━━━━━━━
@@ -3631,7 +3594,7 @@ async function startServer() {
 • Reduce leverage immediately
 • Tighten Stop Losses to breakeven or primary support
 • Avoid trying to catch falling knives
-🤖 _Sentinel 24/7 Bot: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Sentinel 24/7 Bot:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     }
   }
 
@@ -3675,7 +3638,7 @@ async function startServer() {
 📉 *Objetivo Bajista 1:* \`$${downsideTarget1}\`
 📉 *Objetivo Bajista 2:* \`$${downsideTarget2}\`
 ━━━━━━━━━━━━━━━━━━━━
-🤖 _Sentinel 24/7 Guardián: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Sentinel 24/7 Guardián:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     } else {
       return `🚨 *${symbol} — BEARISH BREAKDOWN / DUMP RISK*
 ━━━━━━━━━━━━━━━━━━━━
@@ -3690,7 +3653,7 @@ async function startServer() {
 📉 *Downside Target 1:* \`$${downsideTarget1}\`
 📉 *Downside Target 2:* \`$${downsideTarget2}\`
 ━━━━━━━━━━━━━━━━━━━━
-🤖 _Sentinel 24/7 Guardian: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Sentinel 24/7 Guardian:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
     }
   }
 
@@ -3738,15 +3701,14 @@ async function startServer() {
     const profitPct = Math.abs(entry.profitPct).toFixed(2);
     const dirLabel = entry.type === "BUY" ? "COMPRA" : "VENTA";
     const appUrl =
-      process.env.PUBLIC_APP_URL ||
-      "https://www.sentinelriskbot.com](https://www.sentinelriskbot.com";
+      process.env.PUBLIC_APP_URL || "https://www.sentinelriskbot.com";
 
     return `🎯 *OBJETIVO ALCANZADO (#${cleanSymbol})*
 ✅ Señal de ${dirLabel} enviada hace ${timeElapsed} a miembros PRO acaba de tocar *${entry.targetHit} (+${profitPct}%)*.
 🔒 _No operes a ciegas. Desbloquea las alertas instantáneas 24/7 en Sentinel PRO:_
 👉 [Acceder a Sentinel PRO](${appUrl})
 
-🤖 _Bot Oficial: @${TELEGRAM_BOT_USERNAME}_`;
+🤖 _Bot Oficial:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
   }
 
   interface QueuedAlert {
@@ -6671,7 +6633,7 @@ async function startServer() {
         ? `🛡️ *SENTINEL ALGO MONITOR • ALERTA DE PRUEBA*
 ━━━━━━━━━━━━━━━━━━━━
 ✅ *Estado del Bot:* Conectado y Operativo
-🤖 *Usuario del Bot:* \`@${TELEGRAM_BOT_USERNAME}\`
+🤖 *Usuario del Bot:* [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)
 🆔 *Chat ID:* \`${chatId}\`
 ⚡ *Motor de Análisis:* ALGO QUANT ENGINE (24/7)
 🎯 *Monedas Activas:* \`${cleanTracked
@@ -6683,7 +6645,7 @@ Recibirás notificaciones inmediatas 24/7 para señales institucionales de compr
         : `🛡️ *SENTINEL ALGO MONITOR • TEST ALERT*
 ━━━━━━━━━━━━━━━━━━━━
 ✅ *Bot Status:* Connected and Operational
-🤖 *Bot Handle:* \`@${TELEGRAM_BOT_USERNAME}\`
+🤖 *Bot Handle:* [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)
 🆔 *Chat ID:* \`${chatId}\`
 ⚡ *Analysis Engine:* ALGO QUANT ENGINE (24/7)
 🎯 *Active Monitored Assets:* \`${cleanTracked
@@ -7270,7 +7232,7 @@ Time: ${new Date().toISOString()}`;
 • *Objetivo 2 (Ruptura Liquidez):* \`$${tp2}\`
 • *Ratio Riesgo/Beneficio (R:R):* \`1 : ${rr}\`
 
-🤖 _Bot Oficial: @${TELEGRAM_BOT_USERNAME}_
+🤖 _Bot Oficial:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)
 ⏱️ _Generado en tiempo real por el Sentinel RAM Engine_
 `
       : `
@@ -7292,7 +7254,7 @@ Time: ${new Date().toISOString()}`;
 • *Take Profit 2 (Liquidity Expansion):* \`$${tp2}\`
 • *Risk / Reward Ratio (R:R):* \`1 : ${rr}\`
 
-🤖 _Official Bot: @${TELEGRAM_BOT_USERNAME}_
+🤖 _Official Bot:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)
 ⏱️ _Real-time automated feed by Sentinel RAM Engine_
 `;
 
@@ -7418,7 +7380,7 @@ Time: ${new Date().toISOString()}`;
 • *Objetivo 2 (Barrido de Liquidez):* \`$${tp2}\` (-6.2%)
 • *Ratio Riesgo/Beneficio (R:R):* \`1 : ${rr}\`
 
-🤖 _Bot Oficial: @${TELEGRAM_BOT_USERNAME}_
+🤖 _Bot Oficial:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)
 ⏱️ _Generado en tiempo real por el Sentinel RAM Engine_
 `
       : `
@@ -7440,7 +7402,7 @@ Time: ${new Date().toISOString()}`;
 • *Take Profit 2 (Liquidity Sweep):* \`$${tp2}\` (-6.2%)
 • *Risk / Reward Ratio (R:R):* \`1 : ${rr}\`
 
-🤖 _Official Bot: @${TELEGRAM_BOT_USERNAME}_
+🤖 _Official Bot:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)
 ⏱️ _Real-time automated feed by Sentinel RAM Engine_
 `;
 
@@ -8799,7 +8761,7 @@ ${icon} *SENTINEL • ${titleType}*
 📝 *Tesis Quant:*
 _${signal.rationaleEs || signal.rationaleEn}_
 
-🤖 _Bot Oficial: @${TELEGRAM_BOT_USERNAME}_
+🤖 _Bot Oficial:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)
 ⏱️ _Sentinel RAM Quantitative Trend Engine_
 `
       : `
@@ -8826,7 +8788,7 @@ ${icon} *SENTINEL • ${titleType}*
 📝 *Quant Thesis:*
 _${signal.rationaleEn}_
 
-🤖 _Official Bot: @${TELEGRAM_BOT_USERNAME}_
+🤖 _Official Bot:_ [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)
 ⏱️ _Sentinel Quantitative Trend Engine_
 `;
 
