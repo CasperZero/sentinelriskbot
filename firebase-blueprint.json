@@ -8,9 +8,15 @@
         "id": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
-        "subscription_tier": { "type": "string", "enum": ["free", "pro", "premium"] },
+        "subscription_tier": {
+          "type": "string",
+          "enum": ["free", "pro", "premium"]
+        },
         "subscription_expires_at": { "type": ["number", "string"] },
-        "payment_status": { "type": "string", "enum": ["active", "inactive", "expired"] },
+        "payment_status": {
+          "type": "string",
+          "enum": ["active", "inactive", "expired"]
+        },
         "created_at": { "type": "string" },
         "telegram_chat_id": { "type": "string" },
         "telegram_username": { "type": "string" },
@@ -28,6 +34,35 @@
         }
       },
       "required": ["id", "email", "subscription_tier"]
+    },
+    "winning_signals": {
+      "title": "Global Winning Signals History",
+      "description": "Server-verified trading signals that hit TP1 or TP2 targets against live Binance prices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "symbol": { "type": "string" },
+        "baseAsset": { "type": "string" },
+        "type": { "type": "string", "enum": ["BUY", "SELL"] },
+        "targetHit": { "type": "string", "enum": ["TP1", "TP2"] },
+        "entryPrice": { "type": "number" },
+        "exitPrice": { "type": "number" },
+        "profitPct": { "type": "number" },
+        "dispatchedAt": { "type": "number" },
+        "hitAt": { "type": "number" },
+        "timeElapsedMs": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": [
+        "id",
+        "symbol",
+        "type",
+        "targetHit",
+        "entryPrice",
+        "exitPrice",
+        "profitPct",
+        "hitAt"
+      ]
     }
   }
 }

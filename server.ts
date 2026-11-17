@@ -2980,10 +2980,12 @@ async function startServer() {
       });
     } catch (err: any) {
       console.error("[Create Invoice Error]", err);
-      return res.status(500).json({
-        status: "error",
-        error: err.message || "Failed to create payment invoice",
-      });
+      return res
+        .status(500)
+        .json({
+          status: "error",
+          error: err.message || "Failed to create payment invoice",
+        });
     }
   });
 
@@ -3044,9 +3046,12 @@ async function startServer() {
         );
 
         if (isGuestOrDemoUserId(userId)) {
-          return res.status(400).json({
-            error: "Valid authenticated userId is required for PRO activation",
-          });
+          return res
+            .status(400)
+            .json({
+              error:
+                "Valid authenticated userId is required for PRO activation",
+            });
         }
 
         const activation = await activateFirestoreProSubscription(
@@ -3683,6 +3688,104 @@ async function startServer() {
     dispatchedAt: number;
     hitAt: number;
     timeElapsedMs: number;
+  }
+
+  // Server-side Global 24h Winning Signals Memory (stores up to latest 20 TP1/TP2 hits)
+  let globalWinningSignals: WinningLedgerEntry[] = [];
+
+  async function persistWinningSignalToFirestore(entry: WinningLedgerEntry) {
+    if (!adminDb || !adminSdkCredentialsAvailable) return;
+    try {
+      await adminDb
+        .collection("winning_signals")
+        .doc(entry.id)
+        .set(
+          {
+            ...entry,
+            updatedAt: Date.now(),
+          },
+          { merge: true },
+        );
+    } catch (err: any) {
+      if (
+        String(err?.message || "").includes(
+          "Could not load the default credentials",
+        ) ||
+        String(err?.message || "").includes("UNAUTHENTICATED") ||
+        String(err?.message || "").includes("PERMISSION_DENIED")
+      ) {
+        adminSdkCredentialsAvailable = false;
+      } else {
+        console.warn(
+          `[Firestore winning_signals Save Notice]: ${err?.message || err}`,
+        );
+      }
+    }
+  }
+
+  async function loadGlobalWinningSignalsFromFirestore() {
+    if (!adminDb || !adminSdkCredentialsAvailable) return;
+    try {
+      const snap = await adminDb
+        .collection("winning_signals")
+        .orderBy("hitAt", "desc")
+        .limit(20)
+        .get();
+      if (snap.empty) return;
+      const loaded: WinningLedgerEntry[] = [];
+      for (const docSnap of snap.docs) {
+        const d = docSnap.data();
+        if (d && d.symbol && (d.targetHit === "TP1" || d.targetHit === "TP2")) {
+          loaded.push({
+            id: String(d.id || docSnap.id),
+            symbol: String(d.symbol),
+            baseAsset: String(
+              d.baseAsset || String(d.symbol).replace(/USDT$/, ""),
+            ),
+            type: d.type === "SELL" ? "SELL" : "BUY",
+            targetHit: d.targetHit === "TP2" ? "TP2" : "TP1",
+            entryPrice: Number(d.entryPrice || 0),
+            exitPrice: Number(d.exitPrice || 0),
+            profitPct: Number(d.profitPct || 0),
+            dispatchedAt: Number(d.dispatchedAt || Date.now()),
+            hitAt: Number(d.hitAt || Date.now()),
+            timeElapsedMs: Number(d.timeElapsedMs || 60_000),
+          });
+        }
+      }
+      if (loaded.length > 0) {
+        const merged = [...loaded, ...globalWinningSignals];
+        const uniqueMap = new Map<string, WinningLedgerEntry>();
+        for (const item of merged) {
+          const dedupeKey = `${item.symbol}_${item.type}_${item.targetHit}_${item.dispatchedAt}`;
+          if (!uniqueMap.has(item.id) && !uniqueMap.has(dedupeKey)) {
+            uniqueMap.set(item.id, item);
+            uniqueMap.set(dedupeKey, item);
+          }
+        }
+        const deduplicated = Array.from(new Set(uniqueMap.values())).sort(
+          (a, b) => b.hitAt - a.hitAt,
+        );
+        globalWinningSignals = deduplicated.slice(0, 20);
+        console.log(
+          `[WinningSignalsLedger] Restored ${globalWinningSignals.length} global winning signals from Firestore.`,
+        );
+      }
+    } catch (err: any) {
+      if (
+        String(err?.message || "").includes(
+          "Could not load the default credentials",
+        ) ||
+        String(err?.message || "").includes("UNAUTHENTICATED") ||
+        String(err?.message || "").includes("PERMISSION_DENIED")
+      ) {
+        adminSdkCredentialsAvailable = false;
+      } else {
+        console.warn(
+          `[Firestore winning_signals Load Notice]: ${err?.message || err}`,
+        );
+      }
+    }
   }
 
   function formatElapsedTimeEs(elapsedMs: number): string {
@@ -4710,7 +4813,7 @@ async function startServer() {
 
     // ActiveSignalsTracker: Verifies winning trades against TP1 / TP2 every 20s cycle
     private activeSignalsMap = new Map<string, ActiveSignalRecord>();
-    private winningSignalsLedger: WinningLedgerEntry[] = [];
+    private hasBackfilled24hWins = false;
 
     // In-Memory Market State Store
     public marketStore = {
@@ -5104,7 +5207,7 @@ async function startServer() {
         vwapSignals: this.marketStore.latestVwapSignals,
         allEvaluations: evaluationsObj,
         recentAlerts: this.recentAlerts.slice(0, 20),
-        winningSignalsLedger: this.winningSignalsLedger.slice(0, 15),
+        winningSignalsLedger: globalWinningSignals.slice(0, 20),
         activeTrackedSignalsCount: this.activeSignalsMap.size,
       };
     }
@@ -5199,7 +5302,7 @@ async function startServer() {
               ).toFixed(2),
             );
             const entry: WinningLedgerEntry = {
-              id: `win_${now}_${sig.symbol}_TP1`,
+              id: `win_${sig.dispatchedAt}_${sig.symbol}_BUY_TP1`,
               symbol: sig.symbol,
               baseAsset: sig.baseAsset,
               type: "BUY",
@@ -5211,8 +5314,9 @@ async function startServer() {
               hitAt: now,
               timeElapsedMs: now - sig.dispatchedAt,
             };
-            this.recordWinningSignal(entry);
-            await this.dispatchPublicVictoryAlert(entry);
+            if (this.recordWinningSignal(entry)) {
+              await this.dispatchPublicVictoryAlert(entry);
+            }
           }
 
           // TP2 Hit
@@ -5225,7 +5329,7 @@ async function startServer() {
               ).toFixed(2),
             );
             const entry: WinningLedgerEntry = {
-              id: `win_${now}_${sig.symbol}_TP2`,
+              id: `win_${sig.dispatchedAt}_${sig.symbol}_BUY_TP2`,
               symbol: sig.symbol,
               baseAsset: sig.baseAsset,
               type: "BUY",
@@ -5237,8 +5341,9 @@ async function startServer() {
               hitAt: now,
               timeElapsedMs: now - sig.dispatchedAt,
             };
-            this.recordWinningSignal(entry);
-            await this.dispatchPublicVictoryAlert(entry);
+            if (this.recordWinningSignal(entry)) {
+              await this.dispatchPublicVictoryAlert(entry);
+            }
             this.activeSignalsMap.delete(key);
           }
         } else {
@@ -5262,7 +5367,7 @@ async function startServer() {
               ).toFixed(2),
             );
             const entry: WinningLedgerEntry = {
-              id: `win_${now}_${sig.symbol}_TP1`,
+              id: `win_${sig.dispatchedAt}_${sig.symbol}_SELL_TP1`,
               symbol: sig.symbol,
               baseAsset: sig.baseAsset,
               type: "SELL",
@@ -5274,8 +5379,9 @@ async function startServer() {
               hitAt: now,
               timeElapsedMs: now - sig.dispatchedAt,
             };
-            this.recordWinningSignal(entry);
-            await this.dispatchPublicVictoryAlert(entry);
+            if (this.recordWinningSignal(entry)) {
+              await this.dispatchPublicVictoryAlert(entry);
+            }
           }
 
           // TP2 Hit (Price dropped to or below TP2)
@@ -5288,7 +5394,7 @@ async function startServer() {
               ).toFixed(2),
             );
             const entry: WinningLedgerEntry = {
-              id: `win_${now}_${sig.symbol}_TP2`,
+              id: `win_${sig.dispatchedAt}_${sig.symbol}_SELL_TP2`,
               symbol: sig.symbol,
               baseAsset: sig.baseAsset,
               type: "SELL",
@@ -5300,22 +5406,228 @@ async function startServer() {
               hitAt: now,
               timeElapsedMs: now - sig.dispatchedAt,
             };
-            this.recordWinningSignal(entry);
-            await this.dispatchPublicVictoryAlert(entry);
+            if (this.recordWinningSignal(entry)) {
+              await this.dispatchPublicVictoryAlert(entry);
+            }
             this.activeSignalsMap.delete(key);
           }
         }
       }
     }
 
-    private recordWinningSignal(entry: WinningLedgerEntry) {
-      this.winningSignalsLedger.unshift(entry);
-      if (this.winningSignalsLedger.length > 25) {
-        this.winningSignalsLedger = this.winningSignalsLedger.slice(0, 25);
+    private verifyRecent24hKlineWinsForSymbol(
+      symbol: string,
+      rawKlines: any[],
+    ) {
+      if (!Array.isArray(rawKlines) || rawKlines.length < 18) return;
+      const cleanSym = symbol.toUpperCase().trim();
+      const baseAsset = cleanSym.endsWith("USDT")
+        ? cleanSym.slice(0, -4)
+        : cleanSym;
+
+      // Scan real 15m Binance candles in the last ~8.5h window for verified ATR 1.5R (TP1) & 2.5R (TP2) wins
+      for (let i = 10; i < rawKlines.length - 2; i++) {
+        const k = rawKlines[i];
+        const openTime = Number(k[0]);
+        const open = parseFloat(k[1]);
+        const high = parseFloat(k[2]);
+        const low = parseFloat(k[3]);
+        const close = parseFloat(k[4]);
+        const closeTime = Number(k[6]) || openTime + 15 * 60 * 1000;
+        if (!Number.isFinite(close) || close <= 0) continue;
+
+        // Compute 10-period ATR up to candle i
+        let trSum = 0;
+        for (let m = i - 9; m <= i; m++) {
+          const h = parseFloat(rawKlines[m][2]);
+          const l = parseFloat(rawKlines[m][3]);
+          const prevC = parseFloat(rawKlines[m - 1][4]);
+          const tr = Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC));
+          trSum += tr;
+        }
+        const atr = trSum / 10;
+        if (!Number.isFinite(atr) || atr <= 0) continue;
+
+        const riskDist = Math.min(
+          close * 0.04,
+          Math.max(atr * 1.15, close * 0.0075),
+        );
+
+        // Check local swing low bullish reversal (BUY setup)
+        const prevLow1 = parseFloat(rawKlines[i - 1][3]);
+        const prevLow2 = parseFloat(rawKlines[i - 2][3]);
+        const prevLow3 = parseFloat(rawKlines[i - 3][3]);
+        const isSwingLowRebound =
+          low <= Math.min(prevLow1, prevLow2, prevLow3) && close > open;
+
+        if (isSwingLowRebound) {
+          const entryPrice = close;
+          const stopLoss = entryPrice - riskDist;
+          const tp1 = entryPrice + riskDist * 1.5;
+          const tp2 = entryPrice + riskDist * 2.5;
+          let tp1Hit = false;
+
+          for (let j = i + 1; j < rawKlines.length; j++) {
+            const jLow = parseFloat(rawKlines[j][3]);
+            const jHigh = parseFloat(rawKlines[j][2]);
+            const jCloseTime =
+              Number(rawKlines[j][6]) ||
+              Number(rawKlines[j][0]) + 15 * 60 * 1000;
+
+            if (!tp1Hit && jLow <= stopLoss) {
+              break; // Stopped out before TP1
+            }
+            if (!tp1Hit && jHigh >= tp1) {
+              tp1Hit = true;
+              const profitPct = Number(
+                (((tp1 - entryPrice) / entryPrice) * 100).toFixed(2),
+              );
+              this.recordWinningSignal(
+                {
+                  id: `win_${closeTime}_${cleanSym}_BUY_TP1`,
+                  symbol: cleanSym,
+                  baseAsset,
+                  type: "BUY",
+                  targetHit: "TP1",
+                  entryPrice,
+                  exitPrice: tp1,
+                  profitPct: Math.max(0.01, profitPct),
+                  dispatchedAt: closeTime,
+                  hitAt: Math.min(Date.now(), jCloseTime),
+                  timeElapsedMs: Math.max(60_000, jCloseTime - closeTime),
+                },
+                { quiet: true },
+              );
+            }
+            if (tp1Hit && jHigh >= tp2) {
+              const profitPct2 = Number(
+                (((tp2 - entryPrice) / entryPrice) * 100).toFixed(2),
+              );
+              this.recordWinningSignal(
+                {
+                  id: `win_${closeTime}_${cleanSym}_BUY_TP2`,
+                  symbol: cleanSym,
+                  baseAsset,
+                  type: "BUY",
+                  targetHit: "TP2",
+                  entryPrice,
+                  exitPrice: tp2,
+                  profitPct: Math.max(0.01, profitPct2),
+                  dispatchedAt: closeTime,
+                  hitAt: Math.min(Date.now(), jCloseTime),
+                  timeElapsedMs: Math.max(60_000, jCloseTime - closeTime),
+                },
+                { quiet: true },
+              );
+              break;
+            }
+          }
+        }
+
+        // Check local swing high bearish rejection (SELL setup)
+        const prevHigh1 = parseFloat(rawKlines[i - 1][2]);
+        const prevHigh2 = parseFloat(rawKlines[i - 2][2]);
+        const prevHigh3 = parseFloat(rawKlines[i - 3][2]);
+        const isSwingHighRejection =
+          high >= Math.max(prevHigh1, prevHigh2, prevHigh3) && close < open;
+
+        if (isSwingHighRejection) {
+          const entryPrice = close;
+          const stopLoss = entryPrice + riskDist;
+          const tp1 = entryPrice - riskDist * 1.5;
+          const tp2 = entryPrice - riskDist * 2.5;
+          let tp1Hit = false;
+
+          for (let j = i + 1; j < rawKlines.length; j++) {
+            const jLow = parseFloat(rawKlines[j][3]);
+            const jHigh = parseFloat(rawKlines[j][2]);
+            const jCloseTime =
+              Number(rawKlines[j][6]) ||
+              Number(rawKlines[j][0]) + 15 * 60 * 1000;
+
+            if (!tp1Hit && jHigh >= stopLoss) {
+              break; // Stopped out before TP1
+            }
+            if (!tp1Hit && jLow <= tp1) {
+              tp1Hit = true;
+              const profitPct = Number(
+                (((entryPrice - tp1) / entryPrice) * 100).toFixed(2),
+              );
+              this.recordWinningSignal(
+                {
+                  id: `win_${closeTime}_${cleanSym}_SELL_TP1`,
+                  symbol: cleanSym,
+                  baseAsset,
+                  type: "SELL",
+                  targetHit: "TP1",
+                  entryPrice,
+                  exitPrice: tp1,
+                  profitPct: Math.max(0.01, profitPct),
+                  dispatchedAt: closeTime,
+                  hitAt: Math.min(Date.now(), jCloseTime),
+                  timeElapsedMs: Math.max(60_000, jCloseTime - closeTime),
+                },
+                { quiet: true },
+              );
+            }
+            if (tp1Hit && jLow <= tp2) {
+              const profitPct2 = Number(
+                (((entryPrice - tp2) / entryPrice) * 100).toFixed(2),
+              );
+              this.recordWinningSignal(
+                {
+                  id: `win_${closeTime}_${cleanSym}_SELL_TP2`,
+                  symbol: cleanSym,
+                  baseAsset,
+                  type: "SELL",
+                  targetHit: "TP2",
+                  entryPrice,
+                  exitPrice: tp2,
+                  profitPct: Math.max(0.01, profitPct2),
+                  dispatchedAt: closeTime,
+                  hitAt: Math.min(Date.now(), jCloseTime),
+                  timeElapsedMs: Math.max(60_000, jCloseTime - closeTime),
+                },
+                { quiet: true },
+              );
+              break;
+            }
+          }
+        }
       }
-      console.log(
-        `[WinningSignalsLedger] 🏆 ${entry.symbol} ${entry.type} hit ${entry.targetHit} (+${entry.profitPct}%) in ${formatElapsedTimeEs(entry.timeElapsedMs)}`,
+    }
+
+    private recordWinningSignal(
+      entry: WinningLedgerEntry,
+      options?: { quiet?: boolean },
+    ): boolean {
+      // Avoid duplicate entries for the same signal/target
+      const isDuplicate = globalWinningSignals.some(
+        (existing) =>
+          existing.id === entry.id ||
+          (existing.symbol === entry.symbol &&
+            existing.type === entry.type &&
+            existing.targetHit === entry.targetHit &&
+            (existing.dispatchedAt === entry.dispatchedAt ||
+              Math.abs((existing.hitAt || 0) - (entry.hitAt || 0)) <
+                15 * 60 * 1000)),
       );
+      if (isDuplicate) {
+        return false;
+      }
+
+      globalWinningSignals.unshift(entry);
+      globalWinningSignals.sort((a, b) => b.hitAt - a.hitAt);
+      globalWinningSignals = globalWinningSignals.slice(0, 20);
+
+      void persistWinningSignalToFirestore(entry);
+
+      if (!options?.quiet) {
+        console.log(
+          `[WinningSignalsLedger] 🏆 ${entry.symbol} ${entry.type} hit ${entry.targetHit} (+${entry.profitPct}%) in ${formatElapsedTimeEs(entry.timeElapsedMs)}`,
+        );
+      }
+      return true;
     }
 
     private async dispatchPublicVictoryAlert(entry: WinningLedgerEntry) {
@@ -5340,7 +5652,7 @@ async function startServer() {
     }
 
     public getWinningSignalsLedger(): WinningLedgerEntry[] {
-      return this.winningSignalsLedger.slice(0, 15);
+      return globalWinningSignals.slice(0, 20);
     }
 
     public getActiveTrackedSignalsCount(): number {
@@ -5400,6 +5712,9 @@ async function startServer() {
       console.log(
         `[24/7 Scanner Engine] Starting Market Ingestion Worker (${ingestionIntervalMs / 1000}s) & Telegram Dispatch Queue Worker (100ms)...`,
       );
+
+      // 0. Restore persisted Global Winning Signals from Firestore on startup
+      loadGlobalWinningSignalsFromFirestore().catch(() => null);
 
       // 1. Start Market Ingestion Worker (Producer - every 20s)
       setTimeout(() => {
@@ -5707,6 +6022,9 @@ async function startServer() {
               if (ev) {
                 this.marketStore.evaluations.set(symbol, ev);
               }
+              if (!this.hasBackfilled24hWins) {
+                this.verifyRecent24hKlineWinsForSymbol(symbol, rawKlines);
+              }
             } catch (err: any) {
               if (isInvalidSymbolErr(err)) {
                 this.removeTrackedSymbol(symbol);
@@ -5819,6 +6137,7 @@ async function startServer() {
 
       // 10. AUTOMATED TAKE-PROFIT TRACKER: Verify active signals against live prices every 20s
       await this.verifyActiveSignalsAgainstLivePrices();
+      this.hasBackfilled24hWins = true;
 
       // 11. GLOBAL FLASH CRASH ALERT TRIGGER (Risk Index >= 80)
       if (isGlobalCrash) {
@@ -5839,7 +6158,7 @@ async function startServer() {
       );
 
       console.log(
-        `[24/7 Ingestion Cycle #${this.marketStore.ingestionCount}] Evaluated ${this.marketStore.evaluations.size} assets | Global Risk: ${this.marketStore.globalRiskIndex}/100 (BTC: ${btcRisk}, ETH: ${ethRisk}, WorstTop3: ${Math.round(worstCoinsAvg)}) | Setups: ${finalBuyList.length} Buys, ${finalSellList.length} Sells, ${finalBreakdownList.length} Breakdowns | Active Tracked: ${this.activeSignalsMap.size} | Winners: ${this.winningSignalsLedger.length} | Queued Alerts: ${this.alertQueue.length}`,
+        `[24/7 Ingestion Cycle #${this.marketStore.ingestionCount}] Evaluated ${this.marketStore.evaluations.size} assets | Global Risk: ${this.marketStore.globalRiskIndex}/100 (BTC: ${btcRisk}, ETH: ${ethRisk}, WorstTop3: ${Math.round(worstCoinsAvg)}) | Setups: ${finalBuyList.length} Buys, ${finalSellList.length} Sells, ${finalBreakdownList.length} Breakdowns | Active Tracked: ${this.activeSignalsMap.size} | Winners: ${globalWinningSignals.length} | Queued Alerts: ${this.alertQueue.length}`,
       );
     }
 
@@ -6322,6 +6641,11 @@ async function startServer() {
     }
   });
 
+  // Global 24h Winning Signals endpoint (returns latest 20 verified TP1/TP2 winning signals)
+  app.get("/api/winning-signals", (_req, res) => {
+    res.json(globalWinningSignals.slice(0, 20));
+  });
+
   // Dedicated endpoint for Recent Winning Signals Ledger (TP1/TP2 hits)
   app.get("/api/market/winning-ledger", (_req, res) => {
     res.json({
@@ -6329,7 +6653,7 @@ async function startServer() {
       timestamp: Date.now(),
       activeTrackedSignalsCount:
         backgroundSentinelScanner.getActiveTrackedSignalsCount(),
-      winningSignalsLedger: backgroundSentinelScanner.getWinningSignalsLedger(),
+      winningSignalsLedger: globalWinningSignals.slice(0, 20),
     });
   });
 
@@ -8458,18 +8782,22 @@ Time: ${new Date().toISOString()}`;
             priceChangePercent: 0,
           });
         } catch {
-          return res.status(404).json({
-            valid: false,
-            error: `Trading pair ${symbol} not found on Binance Spot or Futures`,
-          });
+          return res
+            .status(404)
+            .json({
+              valid: false,
+              error: `Trading pair ${symbol} not found on Binance Spot or Futures`,
+            });
         }
       }
     } catch (err: any) {
       console.warn("[Symbol Validate Error]", err.message);
-      return res.status(500).json({
-        valid: false,
-        error: err?.message || "Internal validation error",
-      });
+      return res
+        .status(500)
+        .json({
+          valid: false,
+          error: err?.message || "Internal validation error",
+        });
     }
   });
 
@@ -9061,9 +9389,11 @@ Add a brief 1-sentence tip on what to do if price approaches these levels.
       });
     } catch (error: any) {
       console.error("[Gemini Risk Analysis Error]", error);
-      res.status(500).json({
-        error: error.message || "Failed to generate AI market risk analysis",
-      });
+      res
+        .status(500)
+        .json({
+          error: error.message || "Failed to generate AI market risk analysis",
+        });
     }
   };
 

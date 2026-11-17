@@ -1609,7 +1609,7 @@ export const translations: Record<Language, Translations> = {
     telegramWebhookProTitle:
       "Telegram & Webhook Alert Dispatcher (PRO Exclusive)",
     telegramWebhookProDesc:
-      "Instant sub-second Telegram Bot notifications [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot) and automated JSON HTTP webhooks are exclusive to PRO subscribers.",
+      "Instant sub-second Telegram Bot notifications (@SentinelRiskBot_bot) and automated JSON HTTP webhooks are exclusive to PRO subscribers.",
     unlockTelegramWebhookBtn: "UNLOCK TELEGRAM & WEBHOOK DISPATCHER ($29)",
     webhookDispatchDesc:
       "Dispatches a JSON POST payload whenever the Composite Risk Index breaches configured thresholds.",
@@ -1703,9 +1703,9 @@ export const translations: Record<Language, Translations> = {
     ccMonitoredCountLabel: "coins active",
 
     // Command Center: Block 4 - Recent Winning Signals Ledger
-    ccBlock4Title: "Recent Winning Signals Ledger",
+    ccBlock4Title: "Recent Winning Signals Ledger (Global 24h)",
     ccBlock4Subtitle:
-      "Verified signals from this session that hit TP1 or TP2 targets against live market prices.",
+      "Global verified signals that recently hit TP1 or TP2 targets against live market prices.",
     ccTrackerActiveBadge: "Verifying every 20s",
     ccColAsset: "Asset",
     ccColSignal: "Signal",
@@ -1714,9 +1714,9 @@ export const translations: Record<Language, Translations> = {
     ccColClosed: "Closed",
     ccSignalBuyTag: "BUY",
     ccSignalSellTag: "SELL",
-    ccLedgerEmptyTitle: "No targets closed yet in this session",
+    ccLedgerEmptyTitle: "No global targets closed in the last 24h yet",
     ccLedgerEmptyDesc:
-      "Active signals are checked every 20 seconds against live Binance prices. Completed TP1/TP2 wins appear here automatically.",
+      "Global active signals are checked every 20 seconds against live Binance prices. Completed 24h TP1/TP2 wins appear here automatically.",
 
     // Subscription / Upgrade Modal (5 Core Production Pillars)
     subModalSubtitle:
@@ -2537,7 +2537,7 @@ export const translations: Record<Language, Translations> = {
     manageCryptosPlusMinus: "Gestionar Criptos (+/-)",
     telegramWebhookProTitle: "Alertas Telegram y Webhooks (Exclusivo PRO)",
     telegramWebhookProDesc:
-      "El despacho de alertas automáticas vía Telegram Bot [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot) y Webhooks HTTP de ultra baja latencia está disponible exclusivamente para cuentas Premium.",
+      "El despacho de alertas automáticas vía Telegram Bot (@SentinelRiskBot_bot) y Webhooks HTTP de ultra baja latencia está disponible exclusivamente para cuentas Premium.",
     unlockTelegramWebhookBtn: "DESBLOQUEAR TELEGRAM & WEBHOOKS ($29)",
     webhookDispatchDesc:
       "Enviará un payload JSON POST cuando el Risk Index supere el umbral configurado.",
@@ -2631,9 +2631,9 @@ export const translations: Record<Language, Translations> = {
     ccMonitoredCountLabel: "monedas activas",
 
     // Command Center: Block 4 - Recent Winning Signals Ledger
-    ccBlock4Title: "Historial Reciente de Señales Ganadoras",
+    ccBlock4Title: "Historial Global de Señales Ganadoras (24h)",
     ccBlock4Subtitle:
-      "Señales verificadas en esta sesión que alcanzaron TP1 o TP2 frente a precios reales del mercado.",
+      "Señales globales verificadas que alcanzaron objetivos TP1 o TP2 recientemente frente a precios reales del mercado.",
     ccTrackerActiveBadge: "Verificando cada 20s",
     ccColAsset: "Activo",
     ccColSignal: "Señal",
@@ -2642,9 +2642,10 @@ export const translations: Record<Language, Translations> = {
     ccColClosed: "Cerrada",
     ccSignalBuyTag: "COMPRA",
     ccSignalSellTag: "VENTA",
-    ccLedgerEmptyTitle: "Aún no hay objetivos alcanzados en esta sesión",
+    ccLedgerEmptyTitle:
+      "Aún no hay objetivos globales alcanzados en las últimas 24h",
     ccLedgerEmptyDesc:
-      "Cada señal activa se verifica cada 20 segundos con precios en vivo. Los cierres ganadores en TP1/TP2 aparecerán aquí automáticamente.",
+      "Las señales globales activas se verifican cada 20 segundos con precios en vivo de Binance. Los cierres ganadores 24h en TP1/TP2 aparecerán aquí automáticamente.",
 
     // Subscription / Upgrade Modal (5 Core Production Pillars)
     subModalSubtitle:
