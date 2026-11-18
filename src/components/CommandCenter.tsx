@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   ShieldCheck,
   ShieldAlert,
@@ -15,26 +15,31 @@ import {
   Loader2,
   Flame,
   Star,
-  Globe
-} from 'lucide-react';
-import { useMarket } from '../context/MarketContext';
-import { useCrypto } from '../context/CryptoContext';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import { useVolatilityShield } from '../context/VolatilityShieldContext';
-import { BuySignalItem, SellSignalItem, BreakdownSignalItem, WinningSignalLedgerItem } from '../types';
-import { formatCryptoDisplayPrice } from '../services/livePricesService';
-import { TelegramLinkCard } from './TelegramLinkCard';
+  Globe,
+} from "lucide-react";
+import { useMarket } from "../context/MarketContext";
+import { useCrypto } from "../context/CryptoContext";
+import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { useVolatilityShield } from "../context/VolatilityShieldContext";
+import {
+  BuySignalItem,
+  SellSignalItem,
+  BreakdownSignalItem,
+  WinningSignalLedgerItem,
+} from "../types";
+import { formatCryptoDisplayPrice } from "../services/livePricesService";
+import { TelegramLinkCard } from "./TelegramLinkCard";
 import {
   getIsGlobalMuted,
   playBuySignalChime,
-  playSellSignalChime
-} from '../utils/audioAlerts';
+  playSellSignalChime,
+} from "../utils/audioAlerts";
 
 type UnifiedSignal =
-  | { kind: 'BUY'; item: BuySignalItem }
-  | { kind: 'SELL'; item: SellSignalItem }
-  | { kind: 'BREAKDOWN_WARNING'; item: BreakdownSignalItem };
+  | { kind: "BUY"; item: BuySignalItem }
+  | { kind: "SELL"; item: SellSignalItem }
+  | { kind: "BREAKDOWN_WARNING"; item: BreakdownSignalItem };
 
 export const CommandCenter: React.FC = () => {
   const {
@@ -50,7 +55,7 @@ export const CommandCenter: React.FC = () => {
     buyEligible,
     btcRiskIndex,
     ethRiskIndex,
-    refreshMarketState
+    refreshMarketState,
   } = useMarket();
 
   const {
@@ -59,7 +64,7 @@ export const CommandCenter: React.FC = () => {
     trackedSymbols: contextTrackedSymbols,
     isSymbolInWatchlist,
     toggleWatchlistSymbol,
-    setIsManageModalOpen
+    setIsManageModalOpen,
   } = useCrypto();
 
   const {
@@ -67,17 +72,25 @@ export const CommandCenter: React.FC = () => {
     userProfile,
     openSubscriptionModal,
     updateTrackedSymbols,
-    setIsTelegramModalOpen
+    setIsTelegramModalOpen,
   } = useAuth();
   const { language, t } = useLanguage();
   const { isVolatilityShieldActive } = useVolatilityShield();
 
-  const [signalFilter, setSignalFilter] = useState<'ALL' | 'BUY' | 'SELL'>('ALL');
-  const [watchlistScope, setWatchlistScope] = useState<'WATCHLIST' | 'GLOBAL'>('WATCHLIST');
+  const [signalFilter, setSignalFilter] = useState<"ALL" | "BUY" | "SELL">(
+    "ALL",
+  );
+  const [watchlistScope, setWatchlistScope] = useState<"WATCHLIST" | "GLOBAL">(
+    "WATCHLIST",
+  );
   const [sendingSignalId, setSendingSignalId] = useState<string | null>(null);
   const [pushedMap, setPushedMap] = useState<Record<string, boolean>>({});
-  const [pushErrorMap, setPushErrorMap] = useState<Record<string, string | null>>({});
-  const [globalWinningSignals, setGlobalWinningSignals] = useState<WinningSignalLedgerItem[]>([]);
+  const [pushErrorMap, setPushErrorMap] = useState<
+    Record<string, string | null>
+  >({});
+  const [globalWinningSignals, setGlobalWinningSignals] = useState<
+    WinningSignalLedgerItem[]
+  >([]);
   const seenSignalsRef = useRef<Set<string>>(new Set());
 
   // Fetch Global 24h Winning Signals immediately on mount and poll every 20 seconds
@@ -86,7 +99,7 @@ export const CommandCenter: React.FC = () => {
 
     const fetchGlobalWinningSignals = async () => {
       try {
-        const res = await fetch('/api/winning-signals');
+        const res = await fetch("/api/winning-signals");
         if (!res.ok) return;
         const data = await res.json();
         if (!isMounted) return;
@@ -112,7 +125,10 @@ export const CommandCenter: React.FC = () => {
   }, []);
 
   const displayedWinningSignals = useMemo<WinningSignalLedgerItem[]>(() => {
-    const source = globalWinningSignals.length > 0 ? globalWinningSignals : winningSignalsLedger;
+    const source =
+      globalWinningSignals.length > 0
+        ? globalWinningSignals
+        : winningSignalsLedger;
     return source.slice(0, 20);
   }, [globalWinningSignals, winningSignalsLedger]);
 
@@ -121,16 +137,21 @@ export const CommandCenter: React.FC = () => {
     const source =
       contextTrackedSymbols.length > 0
         ? contextTrackedSymbols
-        : Array.isArray(userProfile?.tracked_symbols) && userProfile.tracked_symbols.length > 0
-        ? userProfile.tracked_symbols
-        : availableSymbols;
+        : Array.isArray(userProfile?.tracked_symbols) &&
+            userProfile.tracked_symbols.length > 0
+          ? userProfile.tracked_symbols
+          : availableSymbols;
     return Array.from(
       new Set(
         source
-          .map((s) => String(s || '').toUpperCase().trim())
+          .map((s) =>
+            String(s || "")
+              .toUpperCase()
+              .trim(),
+          )
           .filter(Boolean)
-          .map((s) => (s.endsWith('USDT') ? s : `${s}USDT`))
-      )
+          .map((s) => (s.endsWith("USDT") ? s : `${s}USDT`)),
+      ),
     );
   }, [contextTrackedSymbols, userProfile?.tracked_symbols, availableSymbols]);
 
@@ -139,16 +160,31 @@ export const CommandCenter: React.FC = () => {
   // All server-monitored pairs for Global Radar scope
   const allSymbols = useMemo<string[]>(() => {
     return Array.from(
-      new Set([
-        ...monitoredSymbols,
-        ...Object.keys(symbolsState),
-        ...trackedSymbols,
-        ...buySignals.map((s) => s.symbol),
-        ...sellSignals.map((s) => s.symbol),
-        ...breakdownSignals.map((s) => s.symbol)
-      ].map((s) => String(s || '').toUpperCase().trim()).filter(Boolean))
+      new Set(
+        [
+          ...monitoredSymbols,
+          ...Object.keys(symbolsState),
+          ...trackedSymbols,
+          ...buySignals.map((s) => s.symbol),
+          ...sellSignals.map((s) => s.symbol),
+          ...breakdownSignals.map((s) => s.symbol),
+        ]
+          .map((s) =>
+            String(s || "")
+              .toUpperCase()
+              .trim(),
+          )
+          .filter(Boolean),
+      ),
     );
-  }, [monitoredSymbols, symbolsState, trackedSymbols, buySignals, sellSignals, breakdownSignals]);
+  }, [
+    monitoredSymbols,
+    symbolsState,
+    trackedSymbols,
+    buySignals,
+    sellSignals,
+    breakdownSignals,
+  ]);
 
   // Mutual Exclusion Rule: Strictly hide ALL Buy signals when Global Risk Index >= 80
   const isCrashShieldLocked =
@@ -167,32 +203,42 @@ export const CommandCenter: React.FC = () => {
       ? []
       : buySignals
           .filter((s) => s.opportunityScore >= 75 && !s.isBuyLocked)
-          .map((item) => ({ kind: 'BUY' as const, item }));
+          .map((item) => ({ kind: "BUY" as const, item }));
 
     const qualifiedSells: UnifiedSignal[] = sellSignals
       .filter((s) => s.opportunityScore >= 75)
-      .map((item) => ({ kind: 'SELL' as const, item }));
+      .map((item) => ({ kind: "SELL" as const, item }));
 
     const qualifiedBreakdowns: UnifiedSignal[] = breakdownSignals
       .filter((s) => s.opportunityScore >= 75)
-      .map((item) => ({ kind: 'BREAKDOWN_WARNING' as const, item }));
+      .map((item) => ({ kind: "BREAKDOWN_WARNING" as const, item }));
 
-    const combined = [...qualifiedBreakdowns, ...qualifiedBuys, ...qualifiedSells].sort(
-      (a, b) => b.item.opportunityScore - a.item.opportunityScore
-    );
+    const combined = [
+      ...qualifiedBreakdowns,
+      ...qualifiedBuys,
+      ...qualifiedSells,
+    ].sort((a, b) => b.item.opportunityScore - a.item.opportunityScore);
 
     // 1. Scope Filter: strictly filter to tracked_symbols when My Watchlist is active
     const scoped =
-      watchlistScope === 'WATCHLIST'
-        ? combined.filter((s) => trackedSet.has(String(s.item.symbol || '').toUpperCase().trim()))
+      watchlistScope === "WATCHLIST"
+        ? combined.filter((s) =>
+            trackedSet.has(
+              String(s.item.symbol || "")
+                .toUpperCase()
+                .trim(),
+            ),
+          )
         : combined;
 
     // 2. Direction Filter
-    if (signalFilter === 'BUY') {
-      return scoped.filter((s) => s.kind === 'BUY');
+    if (signalFilter === "BUY") {
+      return scoped.filter((s) => s.kind === "BUY");
     }
-    if (signalFilter === 'SELL') {
-      return scoped.filter((s) => s.kind === 'SELL' || s.kind === 'BREAKDOWN_WARNING');
+    if (signalFilter === "SELL") {
+      return scoped.filter(
+        (s) => s.kind === "SELL" || s.kind === "BREAKDOWN_WARNING",
+      );
     }
     return scoped;
   }, [
@@ -202,7 +248,7 @@ export const CommandCenter: React.FC = () => {
     isCrashShieldLocked,
     watchlistScope,
     trackedSet,
-    signalFilter
+    signalFilter,
   ]);
 
   // Play crisp audio chime on genuinely new qualifying signals, strictly honoring global mute
@@ -216,7 +262,7 @@ export const CommandCenter: React.FC = () => {
       const key = `${sig.kind}_${sig.item.symbol}`;
       if (!seenSignalsRef.current.has(key)) {
         seenSignalsRef.current.add(key);
-        if (sig.kind === 'BUY') hasNewBuy = true;
+        if (sig.kind === "BUY") hasNewBuy = true;
         else hasNewSell = true;
       }
     }
@@ -236,31 +282,34 @@ export const CommandCenter: React.FC = () => {
     if (globalRiskIndex >= 80 || isCrashWarningActive) {
       return {
         statusText: t.ccStatusCrash,
-        borderClass: 'border-[#F6465D]/60 bg-[#F6465D]/10',
-        scoreTextClass: 'text-[#F6465D]',
-        barBgClass: 'bg-[#F6465D]',
-        icon: <ShieldAlert className="w-7 h-7 text-[#F6465D]" />
+        borderClass: "border-[#F6465D]/60 bg-[#F6465D]/10",
+        scoreTextClass: "text-[#F6465D]",
+        barBgClass: "bg-[#F6465D]",
+        icon: <ShieldAlert className="w-7 h-7 text-[#F6465D]" />,
       };
     }
     if (globalRiskIndex >= 60) {
       return {
         statusText: t.ccStatusCaution,
-        borderClass: 'border-[#F0B90B]/50 bg-[#F0B90B]/10',
-        scoreTextClass: 'text-[#F0B90B]',
-        barBgClass: 'bg-[#F0B90B]',
-        icon: <AlertTriangle className="w-7 h-7 text-[#F0B90B]" />
+        borderClass: "border-[#F0B90B]/50 bg-[#F0B90B]/10",
+        scoreTextClass: "text-[#F0B90B]",
+        barBgClass: "bg-[#F0B90B]",
+        icon: <AlertTriangle className="w-7 h-7 text-[#F0B90B]" />,
       };
     }
     return {
       statusText: t.ccStatusStable,
-      borderClass: 'border-[#0ECB81]/40 bg-[#0ECB81]/10',
-      scoreTextClass: 'text-[#0ECB81]',
-      barBgClass: 'bg-[#0ECB81]',
-      icon: <ShieldCheck className="w-7 h-7 text-[#0ECB81]" />
+      borderClass: "border-[#0ECB81]/40 bg-[#0ECB81]/10",
+      scoreTextClass: "text-[#0ECB81]",
+      barBgClass: "bg-[#0ECB81]",
+      icon: <ShieldCheck className="w-7 h-7 text-[#0ECB81]" />,
     };
   }, [globalRiskIndex, isCrashWarningActive, t]);
 
-  const handleQuickToggleWatchlist = async (symbol: string, livePrice?: number) => {
+  const handleQuickToggleWatchlist = async (
+    symbol: string,
+    livePrice?: number,
+  ) => {
     toggleWatchlistSymbol(symbol, livePrice);
     setTimeout(() => {
       refreshMarketState().catch(() => {});
@@ -268,7 +317,9 @@ export const CommandCenter: React.FC = () => {
   };
 
   const ensureSymbolTracked = async (rawSymbol: string, livePrice?: number) => {
-    const sym = String(rawSymbol || '').toUpperCase().trim();
+    const sym = String(rawSymbol || "")
+      .toUpperCase()
+      .trim();
     if (!sym) return;
     if (!isSymbolInWatchlist(sym)) {
       toggleWatchlistSymbol(sym, livePrice);
@@ -281,7 +332,7 @@ export const CommandCenter: React.FC = () => {
     const item = sig.item;
     const symbol = item.symbol;
     const pushKey = `${sig.kind}_${symbol}`;
-    const telegramChatId = userProfile?.telegram_chat_id?.trim() || '';
+    const telegramChatId = userProfile?.telegram_chat_id?.trim() || "";
 
     setPushErrorMap((prev) => ({ ...prev, [pushKey]: null }));
 
@@ -290,7 +341,10 @@ export const CommandCenter: React.FC = () => {
       try {
         await ensureSymbolTracked(symbol, item.currentPrice);
       } catch (err) {
-        console.warn('[CommandCenter] Failed to pre-add symbol to tracked_symbols:', err);
+        console.warn(
+          "[CommandCenter] Failed to pre-add symbol to tracked_symbols:",
+          err,
+        );
       }
       setIsTelegramModalOpen(true);
       return;
@@ -300,17 +354,17 @@ export const CommandCenter: React.FC = () => {
     const formattedPrice = formatCryptoDisplayPrice(item.currentPrice);
     let signalPayload: Record<string, any>;
 
-    if (sig.kind === 'BREAKDOWN_WARNING') {
+    if (sig.kind === "BREAKDOWN_WARNING") {
       const bd = sig.item;
       const formattedBrokenSupport = formatCryptoDisplayPrice(bd.brokenSupport);
       const formattedEmergencyExit = formatCryptoDisplayPrice(bd.emergencyExit);
       const formattedDownside1 = formatCryptoDisplayPrice(bd.downsideTarget1);
       const formattedDownside2 = formatCryptoDisplayPrice(bd.downsideTarget2);
-      const summaryText = t.ccBreakdownSimpleDesc.replace('{symbol}', symbol);
+      const summaryText = t.ccBreakdownSimpleDesc.replace("{symbol}", symbol);
 
       signalPayload = {
         symbol,
-        type: 'BREAKDOWN_WARNING',
+        type: "BREAKDOWN_WARNING",
         price: formattedPrice,
         currentPrice: bd.currentPrice,
         score: Math.round(bd.opportunityScore),
@@ -318,14 +372,16 @@ export const CommandCenter: React.FC = () => {
         brokenSupport: formattedBrokenSupport,
         stopLoss: formattedEmergencyExit,
         tp1: formattedDownside1,
-        tp2: formattedDownside2
+        tp2: formattedDownside2,
       };
     } else {
       const formattedEntryZone = `${formatCryptoDisplayPrice(item.entryZone?.min)} – ${formatCryptoDisplayPrice(item.entryZone?.max)}`;
       const formattedStopLoss = formatCryptoDisplayPrice(item.stopLoss);
       const formattedTp1 = formatCryptoDisplayPrice(item.takeProfit1);
       const formattedTp2 = formatCryptoDisplayPrice(item.takeProfit2);
-      const summaryText = (sig.kind === 'BUY' ? t.ccBuySimpleDesc : t.ccSellSimpleDesc).replace('{sl}', formattedStopLoss);
+      const summaryText = (
+        sig.kind === "BUY" ? t.ccBuySimpleDesc : t.ccSellSimpleDesc
+      ).replace("{sl}", formattedStopLoss);
 
       signalPayload = {
         symbol,
@@ -337,7 +393,7 @@ export const CommandCenter: React.FC = () => {
         entryZone: formattedEntryZone,
         stopLoss: formattedStopLoss,
         tp1: formattedTp1,
-        tp2: formattedTp2
+        tp2: formattedTp2,
       };
     }
 
@@ -346,19 +402,21 @@ export const CommandCenter: React.FC = () => {
     try {
       // Ensure coin is tracked in Firestore for future 24/7 updates
       ensureSymbolTracked(symbol, item.currentPrice).catch((err) => {
-        console.warn('[CommandCenter] Could not sync tracked_symbols:', err);
+        console.warn("[CommandCenter] Could not sync tracked_symbols:", err);
       });
 
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      const res = await fetch('/api/telegram/push-signal', {
-        method: 'POST',
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      const res = await fetch("/api/telegram/push-signal", {
+        method: "POST",
         headers,
         body: JSON.stringify({
           chatId: telegramChatId,
           signal: signalPayload,
           lang: language,
-          userId: userProfile?.uid
-        })
+          userId: userProfile?.uid,
+        }),
       });
 
       const raw = await res.text();
@@ -369,12 +427,12 @@ export const CommandCenter: React.FC = () => {
         parsed = null;
       }
 
-      if (res.status === 403 && parsed?.code === 'EXPIRED') {
+      if (res.status === 403 && parsed?.code === "EXPIRED") {
         const expMsg =
           parsed?.error ||
-          (language === 'es'
-            ? 'Tu suscripción PRO ha expirado. Renueva para continuar.'
-            : 'Your PRO subscription has expired. Please renew to continue.');
+          (language === "es"
+            ? "Tu suscripción PRO ha expirado. Renueva para continuar."
+            : "Your PRO subscription has expired. Please renew to continue.");
         setPushErrorMap((prev) => ({ ...prev, [pushKey]: expMsg }));
         openSubscriptionModal();
         return;
@@ -386,14 +444,18 @@ export const CommandCenter: React.FC = () => {
           setPushedMap((prev) => ({ ...prev, [pushKey]: false }));
         }, 3000);
       } else {
-        const errMsg = parsed?.error || parsed?.message || `HTTP ${res.status}: Failed to send Telegram alert`;
+        const errMsg =
+          parsed?.error ||
+          parsed?.message ||
+          `HTTP ${res.status}: Failed to send Telegram alert`;
         setPushErrorMap((prev) => ({ ...prev, [pushKey]: errMsg }));
       }
     } catch (err: any) {
-      console.warn('[CommandCenter] Manual Telegram push failed:', err);
+      console.warn("[CommandCenter] Manual Telegram push failed:", err);
       setPushErrorMap((prev) => ({
         ...prev,
-        [pushKey]: err?.message || 'Network error while sending alert to Telegram'
+        [pushKey]:
+          err?.message || "Network error while sending alert to Telegram",
       }));
     } finally {
       setSendingSignalId(null);
@@ -402,26 +464,57 @@ export const CommandCenter: React.FC = () => {
 
   const getCoinIcon = (symbol: string) => {
     const match = cryptoList.find((c) => c.symbol === symbol);
-    return match?.icon || '🪙';
+    return match?.icon || "🪙";
   };
 
   const formatStopDistancePct = (entry: number, stop: number): string => {
     if (!Number.isFinite(entry) || !Number.isFinite(stop) || entry <= 0) {
-      return '4.0%';
+      return "4.0%";
     }
     const rawPct = Math.abs((entry - stop) / entry) * 100;
     const capped = Math.min(4.0, Math.max(0.1, rawPct));
     return `${capped.toFixed(1)}%`;
   };
 
-  const formatLedgerTime = (ts: number) => {
+  const formatRelativeTime = (
+    ts: number,
+    lang: "en" | "es" = language,
+  ): string => {
+    if (!Number.isFinite(ts) || ts <= 0) {
+      return lang === "es" ? "Ahora mismo" : "Just now";
+    }
+    const diffSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (diffSec < 60) {
+      return lang === "es" ? "Ahora mismo" : "Just now";
+    }
+    const diffMins = Math.floor(diffSec / 60);
+    if (diffMins < 60) {
+      if (diffMins === 1) {
+        return lang === "es" ? "Hace 1 min" : "1 min ago";
+      }
+      return lang === "es" ? `Hace ${diffMins} mins` : `${diffMins} mins ago`;
+    }
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) {
+      if (diffHours === 1) {
+        return lang === "es" ? "Hace 1 hora" : "1 hour ago";
+      }
+      return lang === "es"
+        ? `Hace ${diffHours} horas`
+        : `${diffHours} hours ago`;
+    }
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) {
+      return lang === "es" ? "Hace 1 día" : "1 day ago";
+    }
+    return lang === "es" ? `Hace ${diffDays} días` : `${diffDays} days ago`;
+  };
+
+  const formatLocalTooltipTime = (ts: number): string => {
     try {
-      return new Date(ts).toLocaleTimeString(language === 'es' ? 'es-ES' : 'en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      return new Date(ts).toLocaleString();
     } catch {
-      return '--:--';
+      return "";
     }
   };
 
@@ -462,14 +555,18 @@ export const CommandCenter: React.FC = () => {
             <div className="min-w-[140px]">
               <div className="flex items-center justify-between text-[11px] font-mono text-[#848E9C] mb-1">
                 <span>{t.ccRiskIndexLabel}</span>
-                <span className={`font-bold tabular-nums text-sm ${riskTier.scoreTextClass}`}>
+                <span
+                  className={`font-bold tabular-nums text-sm ${riskTier.scoreTextClass}`}
+                >
                   {Math.round(globalRiskIndex)}/100
                 </span>
               </div>
               <div className="h-2 w-full rounded-sm bg-[#181A20] overflow-hidden">
                 <div
                   className={`h-full rounded-sm transition-all duration-500 ${riskTier.barBgClass}`}
-                  style={{ width: `${Math.min(100, Math.max(4, globalRiskIndex))}%` }}
+                  style={{
+                    width: `${Math.min(100, Math.max(4, globalRiskIndex))}%`,
+                  }}
                 />
               </div>
             </div>
@@ -478,28 +575,32 @@ export const CommandCenter: React.FC = () => {
 
             <div className="flex items-center gap-4 font-mono text-xs">
               <div>
-                <div className="text-[10px] text-[#848E9C] uppercase">{t.ccBtcHealthLabel}</div>
+                <div className="text-[10px] text-[#848E9C] uppercase">
+                  {t.ccBtcHealthLabel}
+                </div>
                 <div
                   className={`font-bold tabular-nums text-sm ${
                     btcRiskIndex >= 80
-                      ? 'text-[#F6465D]'
+                      ? "text-[#F6465D]"
                       : btcRiskIndex >= 65
-                      ? 'text-[#F0B90B]'
-                      : 'text-[#EAECEF]'
+                        ? "text-[#F0B90B]"
+                        : "text-[#EAECEF]"
                   }`}
                 >
                   {Math.round(btcRiskIndex)}/100
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-[#848E9C] uppercase">{t.ccEthHealthLabel}</div>
+                <div className="text-[10px] text-[#848E9C] uppercase">
+                  {t.ccEthHealthLabel}
+                </div>
                 <div
                   className={`font-bold tabular-nums text-sm ${
                     ethRiskIndex >= 80
-                      ? 'text-[#F6465D]'
+                      ? "text-[#F6465D]"
                       : ethRiskIndex >= 65
-                      ? 'text-[#F0B90B]'
-                      : 'text-[#EAECEF]'
+                        ? "text-[#F0B90B]"
+                        : "text-[#EAECEF]"
                   }`}
                 >
                   {Math.round(ethRiskIndex)}/100
@@ -518,25 +619,29 @@ export const CommandCenter: React.FC = () => {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {coinsUnderSellingPressure.map((coin) => {
-                const chg1h = typeof coin.priceChange1h === 'number'
-                  ? coin.priceChange1h
-                  : typeof coin.priceChange5m === 'number'
-                  ? coin.priceChange5m
-                  : 0;
+                const chg1h =
+                  typeof coin.priceChange1h === "number"
+                    ? coin.priceChange1h
+                    : typeof coin.priceChange5m === "number"
+                      ? coin.priceChange5m
+                      : 0;
                 const isSevere = coin.riskIndex >= 80;
                 return (
                   <span
                     key={coin.symbol}
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-mono text-xs font-semibold tabular-nums ${
                       isSevere
-                        ? 'bg-[#F6465D]/15 border-[#F6465D]/40 text-[#F6465D]'
-                        : 'bg-[#F0B90B]/15 border-[#F0B90B]/40 text-[#F0B90B]'
+                        ? "bg-[#F6465D]/15 border-[#F6465D]/40 text-[#F6465D]"
+                        : "bg-[#F0B90B]/15 border-[#F0B90B]/40 text-[#F0B90B]"
                     }`}
                   >
                     <span>⚠️ {coin.symbol}</span>
                     <span className="text-[#EAECEF]/90">
                       ({t.ccRiskShortLabel}: {Math.round(coin.riskIndex)}
-                      {Number.isFinite(chg1h) ? ` | 1h: ${chg1h >= 0 ? '+' : ''}${chg1h.toFixed(2)}%` : ''})
+                      {Number.isFinite(chg1h)
+                        ? ` | 1h: ${chg1h >= 0 ? "+" : ""}${chg1h.toFixed(2)}%`
+                        : ""}
+                      )
                     </span>
                   </span>
                 );
@@ -566,25 +671,27 @@ export const CommandCenter: React.FC = () => {
             <div className="inline-flex items-center gap-1 bg-[#181A20] border border-[#2B2F36] rounded-xl p-1 font-mono text-xs">
               <button
                 type="button"
-                onClick={() => setWatchlistScope('WATCHLIST')}
+                onClick={() => setWatchlistScope("WATCHLIST")}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition ${
-                  watchlistScope === 'WATCHLIST'
-                    ? 'bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/40'
-                    : 'text-[#848E9C] hover:text-[#EAECEF]'
+                  watchlistScope === "WATCHLIST"
+                    ? "bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/40"
+                    : "text-[#848E9C] hover:text-[#EAECEF]"
                 }`}
               >
-                <Star className={`w-3.5 h-3.5 ${watchlistScope === 'WATCHLIST' ? 'fill-[#F0B90B] text-[#F0B90B]' : ''}`} />
+                <Star
+                  className={`w-3.5 h-3.5 ${watchlistScope === "WATCHLIST" ? "fill-[#F0B90B] text-[#F0B90B]" : ""}`}
+                />
                 <span>
                   {t.ccScopeWatchlist} ({trackedSymbols.length})
                 </span>
               </button>
               <button
                 type="button"
-                onClick={() => setWatchlistScope('GLOBAL')}
+                onClick={() => setWatchlistScope("GLOBAL")}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition ${
-                  watchlistScope === 'GLOBAL'
-                    ? 'bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/40'
-                    : 'text-[#848E9C] hover:text-[#EAECEF]'
+                  watchlistScope === "GLOBAL"
+                    ? "bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/40"
+                    : "text-[#848E9C] hover:text-[#EAECEF]"
                 }`}
               >
                 <Globe className="w-3.5 h-3.5" />
@@ -598,33 +705,33 @@ export const CommandCenter: React.FC = () => {
             <div className="inline-flex items-center gap-1 bg-[#181A20] border border-[#2B2F36] rounded-xl p-1 font-mono text-xs">
               <button
                 type="button"
-                onClick={() => setSignalFilter('ALL')}
+                onClick={() => setSignalFilter("ALL")}
                 className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-                  signalFilter === 'ALL'
-                    ? 'bg-[#F0B90B] text-slate-950'
-                    : 'text-[#848E9C] hover:text-[#EAECEF]'
+                  signalFilter === "ALL"
+                    ? "bg-[#F0B90B] text-slate-950"
+                    : "text-[#848E9C] hover:text-[#EAECEF]"
                 }`}
               >
                 {t.ccFilterAll}
               </button>
               <button
                 type="button"
-                onClick={() => setSignalFilter('BUY')}
+                onClick={() => setSignalFilter("BUY")}
                 className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-                  signalFilter === 'BUY'
-                    ? 'bg-[#0ECB81] text-slate-950'
-                    : 'text-[#848E9C] hover:text-[#EAECEF]'
+                  signalFilter === "BUY"
+                    ? "bg-[#0ECB81] text-slate-950"
+                    : "text-[#848E9C] hover:text-[#EAECEF]"
                 }`}
               >
                 {t.ccFilterBuy}
               </button>
               <button
                 type="button"
-                onClick={() => setSignalFilter('SELL')}
+                onClick={() => setSignalFilter("SELL")}
                 className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-                  signalFilter === 'SELL'
-                    ? 'bg-[#F6465D] text-white'
-                    : 'text-[#848E9C] hover:text-[#EAECEF]'
+                  signalFilter === "SELL"
+                    ? "bg-[#F6465D] text-white"
+                    : "text-[#848E9C] hover:text-[#EAECEF]"
                 }`}
               >
                 {t.ccFilterSell}
@@ -648,20 +755,20 @@ export const CommandCenter: React.FC = () => {
               <Radar className="w-6 h-6" />
             </div>
             <h3 className="text-sm font-bold text-[#EAECEF] uppercase tracking-wide font-mono">
-              {watchlistScope === 'WATCHLIST'
+              {watchlistScope === "WATCHLIST"
                 ? t.ccEmptyWatchlistSignalsTitle
                 : t.ccEmptySignalsTitle}
             </h3>
             <p className="text-sm text-[#848E9C] max-w-xl mx-auto leading-relaxed">
-              {watchlistScope === 'WATCHLIST'
+              {watchlistScope === "WATCHLIST"
                 ? t.ccEmptyWatchlistSignalsDesc
                 : t.ccEmptySignalsDesc}
             </p>
-            {watchlistScope === 'WATCHLIST' && (
+            {watchlistScope === "WATCHLIST" && (
               <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setWatchlistScope('GLOBAL')}
+                  onClick={() => setWatchlistScope("GLOBAL")}
                   className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#121418] hover:bg-[#2B2F36] border border-[#2B2F36] text-[#F0B90B] font-mono text-xs font-bold transition"
                 >
                   <Globe className="w-3.5 h-3.5" />
@@ -683,8 +790,8 @@ export const CommandCenter: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {unifiedSignals.map((sig) => {
-              const isBreakdown = sig.kind === 'BREAKDOWN_WARNING';
-              const isBuy = sig.kind === 'BUY';
+              const isBreakdown = sig.kind === "BREAKDOWN_WARNING";
+              const isBuy = sig.kind === "BUY";
               const item = sig.item;
               const pushKey = `${sig.kind}_${item.symbol}`;
               const isPushing = sendingSignalId === pushKey;
@@ -694,12 +801,26 @@ export const CommandCenter: React.FC = () => {
 
               if (isBreakdown) {
                 const bd = sig.item;
-                const formattedBrokenSupport = formatCryptoDisplayPrice(bd.brokenSupport);
-                const formattedEmergencyStop = formatCryptoDisplayPrice(bd.emergencyExit);
-                const formattedDownside1 = formatCryptoDisplayPrice(bd.downsideTarget1);
-                const formattedDownside2 = formatCryptoDisplayPrice(bd.downsideTarget2);
-                const headline = t.ccBreakdownHeadline.replace('{symbol}', bd.symbol);
-                const explanation = t.ccBreakdownSimpleDesc.replace('{symbol}', bd.symbol);
+                const formattedBrokenSupport = formatCryptoDisplayPrice(
+                  bd.brokenSupport,
+                );
+                const formattedEmergencyStop = formatCryptoDisplayPrice(
+                  bd.emergencyExit,
+                );
+                const formattedDownside1 = formatCryptoDisplayPrice(
+                  bd.downsideTarget1,
+                );
+                const formattedDownside2 = formatCryptoDisplayPrice(
+                  bd.downsideTarget2,
+                );
+                const headline = t.ccBreakdownHeadline.replace(
+                  "{symbol}",
+                  bd.symbol,
+                );
+                const explanation = t.ccBreakdownSimpleDesc.replace(
+                  "{symbol}",
+                  bd.symbol,
+                );
 
                 return (
                   <article
@@ -718,7 +839,8 @@ export const CommandCenter: React.FC = () => {
                               {bd.symbol}
                             </span>
                             <span className="font-mono text-[11px] text-[#F6465D] font-semibold tabular-nums">
-                              {t.ccConfidenceLabel} {Math.round(bd.opportunityScore)}/100
+                              {t.ccConfidenceLabel}{" "}
+                              {Math.round(bd.opportunityScore)}/100
                             </span>
                           </div>
                           <div className="flex items-center gap-2 font-mono mt-0.5">
@@ -726,7 +848,8 @@ export const CommandCenter: React.FC = () => {
                               {formatCryptoDisplayPrice(bd.currentPrice)}
                             </span>
                             <span className="text-xs font-semibold text-[#F6465D] tabular-nums">
-                              (1h: {bd.priceChange1h >= 0 ? '+' : ''}{bd.priceChange1h.toFixed(2)}%)
+                              (1h: {bd.priceChange1h >= 0 ? "+" : ""}
+                              {bd.priceChange1h.toFixed(2)}%)
                             </span>
                           </div>
                         </div>
@@ -739,18 +862,35 @@ export const CommandCenter: React.FC = () => {
                         </span>
                         <button
                           type="button"
-                          onClick={() => handleQuickToggleWatchlist(bd.symbol, bd.currentPrice)}
-                          title={inWatchlist ? t.ccRemoveFromWatchlistTooltip : t.ccAddToWatchlistTooltip}
-                          aria-label={inWatchlist ? t.ccRemoveFromWatchlistTooltip : t.ccAddToWatchlistTooltip}
+                          onClick={() =>
+                            handleQuickToggleWatchlist(
+                              bd.symbol,
+                              bd.currentPrice,
+                            )
+                          }
+                          title={
+                            inWatchlist
+                              ? t.ccRemoveFromWatchlistTooltip
+                              : t.ccAddToWatchlistTooltip
+                          }
+                          aria-label={
+                            inWatchlist
+                              ? t.ccRemoveFromWatchlistTooltip
+                              : t.ccAddToWatchlistTooltip
+                          }
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold border transition ${
                             inWatchlist
-                              ? 'bg-[#F0B90B]/15 text-[#F0B90B] border-[#F0B90B]/40 hover:bg-[#F6465D]/15 hover:text-[#F6465D] hover:border-[#F6465D]/40'
-                              : 'bg-[#121418] text-[#848E9C] border-[#2B2F36] hover:text-[#F0B90B] hover:border-[#F0B90B]/40'
+                              ? "bg-[#F0B90B]/15 text-[#F0B90B] border-[#F0B90B]/40 hover:bg-[#F6465D]/15 hover:text-[#F6465D] hover:border-[#F6465D]/40"
+                              : "bg-[#121418] text-[#848E9C] border-[#2B2F36] hover:text-[#F0B90B] hover:border-[#F0B90B]/40"
                           }`}
                         >
-                          <Star className={`w-3.5 h-3.5 ${inWatchlist ? 'fill-[#F0B90B] text-[#F0B90B]' : ''}`} />
+                          <Star
+                            className={`w-3.5 h-3.5 ${inWatchlist ? "fill-[#F0B90B] text-[#F0B90B]" : ""}`}
+                          />
                           <span className="hidden sm:inline">
-                            {inWatchlist ? t.ccInWatchlistBtn : t.ccAddToWatchlistBtn}
+                            {inWatchlist
+                              ? t.ccInWatchlistBtn
+                              : t.ccAddToWatchlistBtn}
                           </span>
                         </button>
                       </div>
@@ -814,8 +954,8 @@ export const CommandCenter: React.FC = () => {
                           disabled={isPushing}
                           className={`px-3.5 py-2 rounded-lg font-mono text-xs font-bold transition flex items-center gap-2 disabled:opacity-70 ${
                             wasPushed
-                              ? 'bg-[#0ECB81]/20 text-[#0ECB81] border border-[#0ECB81]/40'
-                              : 'bg-[#0088cc] hover:bg-[#0077b5] text-white'
+                              ? "bg-[#0ECB81]/20 text-[#0ECB81] border border-[#0ECB81]/40"
+                              : "bg-[#0088cc] hover:bg-[#0077b5] text-white"
                           }`}
                         >
                           {isPushing ? (
@@ -856,10 +996,10 @@ export const CommandCenter: React.FC = () => {
               const formattedSl = formatCryptoDisplayPrice(item.stopLoss);
               const simpleExplanation = (
                 isBuy ? t.ccBuySimpleDesc : t.ccSellSimpleDesc
-              ).replace('{sl}', formattedSl);
+              ).replace("{sl}", formattedSl);
               const stopDistance = formatStopDistancePct(
                 item.currentPrice,
-                item.stopLoss
+                item.stopLoss,
               );
 
               return (
@@ -879,7 +1019,8 @@ export const CommandCenter: React.FC = () => {
                             {item.symbol}
                           </span>
                           <span className="font-mono text-[11px] text-[#848E9C] tabular-nums">
-                            {t.ccConfidenceLabel} {Math.round(item.opportunityScore)}/100
+                            {t.ccConfidenceLabel}{" "}
+                            {Math.round(item.opportunityScore)}/100
                           </span>
                         </div>
                         <div className="font-mono font-bold text-lg text-[#F0B90B] tabular-nums mt-0.5">
@@ -892,8 +1033,8 @@ export const CommandCenter: React.FC = () => {
                       <span
                         className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono text-xs font-bold border ${
                           isBuy
-                            ? 'bg-[#0ECB81]/15 text-[#0ECB81] border-[#0ECB81]/30'
-                            : 'bg-[#F6465D]/15 text-[#F6465D] border-[#F6465D]/30'
+                            ? "bg-[#0ECB81]/15 text-[#0ECB81] border-[#0ECB81]/30"
+                            : "bg-[#F6465D]/15 text-[#F6465D] border-[#F6465D]/30"
                         }`}
                       >
                         {isBuy ? (
@@ -906,18 +1047,35 @@ export const CommandCenter: React.FC = () => {
 
                       <button
                         type="button"
-                        onClick={() => handleQuickToggleWatchlist(item.symbol, item.currentPrice)}
-                        title={inWatchlist ? t.ccRemoveFromWatchlistTooltip : t.ccAddToWatchlistTooltip}
-                        aria-label={inWatchlist ? t.ccRemoveFromWatchlistTooltip : t.ccAddToWatchlistTooltip}
+                        onClick={() =>
+                          handleQuickToggleWatchlist(
+                            item.symbol,
+                            item.currentPrice,
+                          )
+                        }
+                        title={
+                          inWatchlist
+                            ? t.ccRemoveFromWatchlistTooltip
+                            : t.ccAddToWatchlistTooltip
+                        }
+                        aria-label={
+                          inWatchlist
+                            ? t.ccRemoveFromWatchlistTooltip
+                            : t.ccAddToWatchlistTooltip
+                        }
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold border transition ${
                           inWatchlist
-                            ? 'bg-[#F0B90B]/15 text-[#F0B90B] border-[#F0B90B]/40 hover:bg-[#F6465D]/15 hover:text-[#F6465D] hover:border-[#F6465D]/40'
-                            : 'bg-[#121418] text-[#848E9C] border-[#2B2F36] hover:text-[#F0B90B] hover:border-[#F0B90B]/40'
+                            ? "bg-[#F0B90B]/15 text-[#F0B90B] border-[#F0B90B]/40 hover:bg-[#F6465D]/15 hover:text-[#F6465D] hover:border-[#F6465D]/40"
+                            : "bg-[#121418] text-[#848E9C] border-[#2B2F36] hover:text-[#F0B90B] hover:border-[#F0B90B]/40"
                         }`}
                       >
-                        <Star className={`w-3.5 h-3.5 ${inWatchlist ? 'fill-[#F0B90B] text-[#F0B90B]' : ''}`} />
+                        <Star
+                          className={`w-3.5 h-3.5 ${inWatchlist ? "fill-[#F0B90B] text-[#F0B90B]" : ""}`}
+                        />
                         <span className="hidden sm:inline">
-                          {inWatchlist ? t.ccInWatchlistBtn : t.ccAddToWatchlistBtn}
+                          {inWatchlist
+                            ? t.ccInWatchlistBtn
+                            : t.ccAddToWatchlistBtn}
                         </span>
                       </button>
                     </div>
@@ -935,7 +1093,7 @@ export const CommandCenter: React.FC = () => {
                         {t.ccPlanEntryZone}
                       </div>
                       <div className="font-bold text-[#EAECEF] tabular-nums mt-1 text-[11px]">
-                        {formatCryptoDisplayPrice(item.entryZone?.min)} –{' '}
+                        {formatCryptoDisplayPrice(item.entryZone?.min)} –{" "}
                         {formatCryptoDisplayPrice(item.entryZone?.max)}
                       </div>
                     </div>
@@ -980,8 +1138,8 @@ export const CommandCenter: React.FC = () => {
                         disabled={isPushing}
                         className={`px-3.5 py-2 rounded-lg font-mono text-xs font-bold transition flex items-center gap-2 disabled:opacity-70 ${
                           wasPushed
-                            ? 'bg-[#0ECB81]/20 text-[#0ECB81] border border-[#0ECB81]/40'
-                            : 'bg-[#0088cc] hover:bg-[#0077b5] text-white'
+                            ? "bg-[#0ECB81]/20 text-[#0ECB81] border border-[#0ECB81]/40"
+                            : "bg-[#0088cc] hover:bg-[#0077b5] text-white"
                         }`}
                       >
                         {isPushing ? (
@@ -1025,7 +1183,11 @@ export const CommandCenter: React.FC = () => {
       {/* ===================================================================== */}
       {/* BLOCK 3: TELEGRAM 24/7 HUB & DYNAMIC COIN SELECTOR                    */}
       {/* ===================================================================== */}
-      <section id="telegram-hub-block" aria-label={t.ccBlock3Title} className="space-y-4">
+      <section
+        id="telegram-hub-block"
+        aria-label={t.ccBlock3Title}
+        className="space-y-4"
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg sm:text-xl font-bold text-[#EAECEF] tracking-tight">
@@ -1071,7 +1233,7 @@ export const CommandCenter: React.FC = () => {
 
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#181A20] border border-[#2B2F36] font-mono text-xs text-[#848E9C] self-start sm:self-auto">
             <span className="text-[#0ECB81] font-bold tabular-nums">
-              {activeTrackedSignalsCount}
+              {displayedWinningSignals.length}
             </span>
             <span>•</span>
             <span>{t.ccTrackerActiveBadge}</span>
@@ -1096,15 +1258,29 @@ export const CommandCenter: React.FC = () => {
                     <th className="py-3 px-4 font-semibold">{t.ccColAsset}</th>
                     <th className="py-3 px-4 font-semibold">{t.ccColSignal}</th>
                     <th className="py-3 px-4 font-semibold">{t.ccColTarget}</th>
-                    <th className="py-3 px-4 font-semibold text-right">{t.ccColGain}</th>
-                    <th className="py-3 px-4 font-semibold text-right">{t.ccColClosed}</th>
+                    <th className="py-3 px-4 font-semibold text-right">
+                      {t.ccColGain}
+                    </th>
+                    <th className="py-3 px-4 font-semibold text-right">
+                      {t.ccColClosed}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#2B2F36]">
-                  {displayedWinningSignals.map((entry) => {
-                    const isBuyWin = entry.type === 'BUY';
+                  {displayedWinningSignals.map((entry: any) => {
+                    const signalDir = entry.type || entry.signal || "BUY";
+                    const isBuyWin = signalDir === "BUY";
+                    const gainValue = Number(
+                      entry.gainPct ?? entry.profitPct ?? 0,
+                    );
+                    const closedTimestamp = Number(
+                      entry.closedAt ?? entry.hitAt ?? Date.now(),
+                    );
                     return (
-                      <tr key={entry.id} className="hover:bg-[#121418]/60 transition">
+                      <tr
+                        key={entry.id}
+                        className="hover:bg-[#121418]/60 transition"
+                      >
                         <td className="py-3 px-4 font-bold text-[#EAECEF]">
                           <div className="flex items-center gap-2">
                             <span>{getCoinIcon(entry.symbol)}</span>
@@ -1115,8 +1291,8 @@ export const CommandCenter: React.FC = () => {
                           <span
                             className={`inline-block px-2 py-0.5 rounded font-bold text-[10px] ${
                               isBuyWin
-                                ? 'bg-[#0ECB81]/15 text-[#0ECB81]'
-                                : 'bg-[#F6465D]/15 text-[#F6465D]'
+                                ? "bg-[#0ECB81]/15 text-[#0ECB81]"
+                                : "bg-[#F6465D]/15 text-[#F6465D]"
                             }`}
                           >
                             {isBuyWin ? t.ccSignalBuyTag : t.ccSignalSellTag}
@@ -1128,10 +1304,12 @@ export const CommandCenter: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right font-bold text-[#0ECB81] tabular-nums">
-                          +{entry.profitPct.toFixed(2)}%
+                          +{gainValue.toFixed(2)}%
                         </td>
                         <td className="py-3 px-4 text-right text-[#848E9C] tabular-nums">
-                          {formatLedgerTime(entry.hitAt)}
+                          <span title={formatLocalTooltipTime(closedTimestamp)}>
+                            {formatRelativeTime(closedTimestamp, language)}
+                          </span>
                         </td>
                       </tr>
                     );
