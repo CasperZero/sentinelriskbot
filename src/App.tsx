@@ -354,8 +354,8 @@ function MainApp() {
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
             <span className="text-[#EAECEF] font-semibold">Copyright © 2026 Sentinel.</span>
             <span>·</span>
-            <a href="mailto:support@sentinel.com" className="text-[#F0B90B] hover:underline">
-              support@sentinel.com
+            <a href="mailto:support@sentinelriskbot.com" className="text-[#F0B90B] hover:underline">
+              support@sentinelriskbot.com
             </a>
           </div>
 

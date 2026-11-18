@@ -440,7 +440,7 @@ export const VwapEmaScanner: React.FC<VwapEmaScannerProps> = ({
 
             {/* Audio Settings Dropdown */}
             {isSoundSettingsOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-[#181A20] border border-[#2B2F36] rounded-xl shadow-2xl p-4 z-50 text-xs space-y-3">
+              <div className="fixed top-28 left-4 right-4 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:mt-2 sm:w-72 z-50 max-h-[75vh] overflow-y-auto bg-[#181A20] border border-[#2B2F36] rounded-xl shadow-2xl p-4 text-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-[#2B2F36]">
                   <span className="font-bold text-[#EAECEF]">{t.vwapAudioSettings}</span>
                   <button

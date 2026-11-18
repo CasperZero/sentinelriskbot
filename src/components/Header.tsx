@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
 import {
   Volume2,
   VolumeX,
@@ -12,19 +12,15 @@ import {
   Sliders,
   ShieldAlert,
   Play,
-  Clock,
-} from "lucide-react";
-import { RiskMetrics, AlertTriggerConfig } from "../types";
-import { useLanguage } from "../context/LanguageContext";
-import { useAuth } from "../context/AuthContext";
-import { useCrypto } from "../context/CryptoContext";
-import { useVolatilityShield } from "../context/VolatilityShieldContext";
-import {
-  ALARM_SOUND_OPTIONS,
-  playAlarmSound,
-  setGlobalMuted,
-} from "../utils/audioAlerts";
-import { TelegramLinkCard } from "./TelegramLinkCard";
+  Clock
+} from 'lucide-react';
+import { RiskMetrics, AlertTriggerConfig } from '../types';
+import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { useCrypto } from '../context/CryptoContext';
+import { useVolatilityShield } from '../context/VolatilityShieldContext';
+import { ALARM_SOUND_OPTIONS, playAlarmSound, setGlobalMuted } from '../utils/audioAlerts';
+import { TelegramLinkCard } from './TelegramLinkCard';
 
 interface HeaderProps {
   isConnected: boolean;
@@ -40,7 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   config,
   onUpdateConfig,
   soundEnabled,
-  setSoundEnabled,
+  setSoundEnabled
 }) => {
   const { language, setLanguage, t } = useLanguage();
   const {
@@ -52,36 +48,33 @@ export const Header: React.FC<HeaderProps> = ({
     logout,
     updateLanguagePreference,
     isTelegramModalOpen,
-    setIsTelegramModalOpen,
+    setIsTelegramModalOpen
   } = useAuth();
   const { cryptoList, availableSymbols, setIsManageModalOpen } = useCrypto();
   const {
     isVolatilityShieldActive,
     currentEvent,
     minutesRemaining,
-    toggleShieldSimulation,
+    toggleShieldSimulation
   } = useVolatilityShield();
 
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isSoundPickerOpen, setIsSoundPickerOpen] = useState(false);
   const [isShieldPopoverOpen, setIsShieldPopoverOpen] = useState(false);
 
-  const handleToggleLanguage = (newLang: "en" | "es") => {
+  const handleToggleLanguage = (newLang: 'en' | 'es') => {
     setLanguage(newLang);
     if (userProfile?.uid || user?.uid) {
       updateLanguagePreference(newLang).catch((err) => {
-        console.warn(
-          "[Header] Failed to sync language preference to Firestore:",
-          err,
-        );
+        console.warn('[Header] Failed to sync language preference to Firestore:', err);
       });
     }
   };
 
   return (
-    <header className="bg-[#0B0E11] border-b border-[#2B2F36] text-[#EAECEF] sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center justify-between py-3 gap-3">
+    <header className="bg-[#0B0E11] border-b border-[#2B2F36] text-[#EAECEF] sticky top-0 z-40 overflow-visible">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-visible">
+        <div className="flex flex-wrap items-center justify-between py-3 gap-3 overflow-visible">
           {/* Brand Wordmark + Real-Time Connection State */}
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-[#F0B90B] flex items-center justify-center text-slate-950 font-black text-base shadow-sm">
@@ -95,16 +88,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="inline-flex items-center gap-1.5 font-mono text-[10px] px-2 py-0.5 rounded bg-[#181A20] border border-[#2B2F36]">
                   <span
                     className={`w-1.5 h-1.5 rounded-full ${
-                      isConnected
-                        ? "bg-[#0ECB81] animate-pulse"
-                        : "bg-[#F6465D]"
+                      isConnected ? 'bg-[#0ECB81] animate-pulse' : 'bg-[#F6465D]'
                     }`}
                   />
-                  <span
-                    className={
-                      isConnected ? "text-[#0ECB81]" : "text-[#F6465D]"
-                    }
-                  >
+                  <span className={isConnected ? 'text-[#0ECB81]' : 'text-[#F6465D]'}>
                     {isConnected ? t.hdrLiveTag : t.hdrOfflineTag}
                   </span>
                 </span>
@@ -116,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Right Controls: Manage Coins, Shield Popover, Audio, Language Toggle, Account */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap overflow-visible">
             {/* Manage Coins Quick Trigger */}
             <button
               type="button"
@@ -125,40 +112,45 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Sliders className="w-3.5 h-3.5 text-[#F0B90B]" />
               <span className="hidden sm:inline">{t.hdrManageCoins}</span>
-              <span className="text-[#848E9C] tabular-nums">
-                ({cryptoList.length})
-              </span>
+              <span className="text-[#848E9C] tabular-nums">({cryptoList.length})</span>
             </button>
 
             {/* Macro Volatility Shield Status */}
-            <div className="relative">
+            <div className="sm:relative overflow-visible">
               <button
                 type="button"
-                onClick={() => setIsShieldPopoverOpen(!isShieldPopoverOpen)}
+                onClick={() => {
+                  const next = !isShieldPopoverOpen;
+                  setIsShieldPopoverOpen(next);
+                  if (next) {
+                    setIsSoundPickerOpen(false);
+                    setIsAccountMenuOpen(false);
+                  }
+                }}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold font-mono transition border ${
                   isVolatilityShieldActive
-                    ? "bg-amber-500/20 text-amber-300 border-amber-500/50"
-                    : "bg-[#181A20] text-[#0ECB81] border-[#2B2F36] hover:border-[#0ECB81]/40"
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                    : 'bg-[#181A20] text-[#0ECB81] border-[#2B2F36] hover:border-[#0ECB81]/40'
                 }`}
               >
                 <ShieldAlert className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">
                   {isVolatilityShieldActive
-                    ? `${t.hdrMacroShieldActive}${minutesRemaining > 0 ? ` (${minutesRemaining}m)` : ""}`
+                    ? `${t.hdrMacroShieldActive}${minutesRemaining > 0 ? ` (${minutesRemaining}m)` : ''}`
                     : t.hdrMacroShieldArmed}
                 </span>
                 <ChevronDown className="w-3 h-3 opacity-70" />
               </button>
 
               {isShieldPopoverOpen && (
-                <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-xs sm:w-72 bg-[#181A20] border border-[#2B2F36] rounded-xl shadow-2xl p-3 z-50 font-mono text-xs space-y-2.5">
+                <div className="absolute top-full left-4 right-4 mt-2 sm:left-auto sm:right-0 sm:w-72 z-50 max-h-[75vh] overflow-y-auto bg-[#181A20] border border-[#2B2F36] rounded-xl shadow-2xl p-3 font-mono text-xs space-y-2.5">
                   <div className="flex items-center justify-between pb-2 border-b border-[#2B2F36]">
                     <span className="font-bold text-[#EAECEF]">
-                      {currentEvent?.title || "FOMC / CPI Shield"}
+                      {currentEvent?.title || 'FOMC / CPI Shield'}
                     </span>
                     {isVolatilityShieldActive && (
                       <span className="text-[10px] text-amber-300 font-bold">
-                        {minutesRemaining > 0 ? `${minutesRemaining}m` : "30m"}
+                        {minutesRemaining > 0 ? `${minutesRemaining}m` : '30m'}
                       </span>
                     )}
                   </div>
@@ -175,9 +167,7 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <Play className="w-3 h-3 fill-current text-[#F0B90B]" />
                     <span>
-                      {isVolatilityShieldActive
-                        ? "Deactivate Test"
-                        : "Test Macro Shield"}
+                      {isVolatilityShieldActive ? 'Deactivate Test' : 'Test Macro Shield'}
                     </span>
                   </button>
                 </div>
@@ -185,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Audio Mute / Unmute & Sound Picker */}
-            <div className="relative flex items-center">
+            <div className="sm:relative flex items-center overflow-visible">
               <button
                 type="button"
                 onClick={() => {
@@ -195,17 +185,13 @@ export const Header: React.FC<HeaderProps> = ({
                 }}
                 className={`p-2 rounded-l-lg border text-xs transition ${
                   soundEnabled
-                    ? "bg-[#F0B90B]/10 border-[#F0B90B]/40 text-[#F0B90B]"
-                    : "bg-[#181A20] border-[#2B2F36] text-[#848E9C] hover:text-[#EAECEF]"
+                    ? 'bg-[#F0B90B]/10 border-[#F0B90B]/40 text-[#F0B90B]'
+                    : 'bg-[#181A20] border-[#2B2F36] text-[#848E9C] hover:text-[#EAECEF]'
                 }`}
                 title={soundEnabled ? t.hdrMuteAudio : t.hdrUnmuteAudio}
                 aria-label={soundEnabled ? t.hdrMuteAudio : t.hdrUnmuteAudio}
               >
-                {soundEnabled ? (
-                  <Volume2 className="w-4 h-4" />
-                ) : (
-                  <VolumeX className="w-4 h-4" />
-                )}
+                {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
               </button>
               <button
                 type="button"
@@ -214,31 +200,32 @@ export const Header: React.FC<HeaderProps> = ({
                     openSubscriptionModal();
                     return;
                   }
-                  setIsSoundPickerOpen(!isSoundPickerOpen);
+                  const next = !isSoundPickerOpen;
+                  setIsSoundPickerOpen(next);
+                  if (next) {
+                    setIsShieldPopoverOpen(false);
+                    setIsAccountMenuOpen(false);
+                  }
                 }}
                 className={`p-2 rounded-r-lg border-t border-b border-r text-xs transition ${
                   isSoundPickerOpen
-                    ? "bg-[#F0B90B] text-slate-950 border-[#F0B90B]"
-                    : "bg-[#181A20] border-[#2B2F36] text-[#848E9C] hover:text-[#EAECEF]"
+                    ? 'bg-[#F0B90B] text-slate-950 border-[#F0B90B]'
+                    : 'bg-[#181A20] border-[#2B2F36] text-[#848E9C] hover:text-[#EAECEF]'
                 }`}
                 title={t.alarmSoundTypeLabel}
               >
-                <ChevronDown
-                  className={`w-3 h-3 transition ${isSoundPickerOpen ? "rotate-180" : ""}`}
-                />
+                <ChevronDown className={`w-3 h-3 transition ${isSoundPickerOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isSoundPickerOpen && (
-                <div className="absolute right-0 top-full mt-2 w-60 bg-[#181A20] border border-[#2B2F36] rounded-xl shadow-2xl p-2 z-50 font-mono text-xs space-y-1">
+                <div className="absolute top-full left-4 right-4 mt-2 sm:left-auto sm:right-0 sm:w-72 z-50 max-h-[75vh] overflow-y-auto bg-[#181A20] border border-[#2B2F36] rounded-xl shadow-2xl p-2 font-mono text-xs space-y-1">
                   <div className="text-[10px] text-[#848E9C] px-2 py-1 uppercase font-bold border-b border-[#2B2F36]">
                     {t.alarmSoundTypeLabel}
                   </div>
-                  <div className="max-h-56 overflow-y-auto space-y-1 py-1">
+                  <div className="space-y-1 py-1">
                     {ALARM_SOUND_OPTIONS.map((snd) => {
-                      const isSelected =
-                        (config.alarmSoundType || "siren") === snd.id;
-                      const soundName =
-                        language === "es" ? snd.nameEs : snd.nameEn;
+                      const isSelected = (config.alarmSoundType || 'siren') === snd.id;
+                      const soundName = language === 'es' ? snd.nameEs : snd.nameEn;
 
                       return (
                         <button
@@ -246,10 +233,7 @@ export const Header: React.FC<HeaderProps> = ({
                           type="button"
                           onClick={() => {
                             if (onUpdateConfig) {
-                              onUpdateConfig({
-                                ...config,
-                                alarmSoundType: snd.id,
-                              });
+                              onUpdateConfig({ ...config, alarmSoundType: snd.id });
                             }
                             if (soundEnabled) {
                               playAlarmSound(snd.id);
@@ -258,8 +242,8 @@ export const Header: React.FC<HeaderProps> = ({
                           }}
                           className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-left transition ${
                             isSelected
-                              ? "bg-[#F0B90B]/15 text-[#F0B90B] font-bold border border-[#F0B90B]/30"
-                              : "text-[#EAECEF] hover:bg-[#2B2F36]"
+                              ? 'bg-[#F0B90B]/15 text-[#F0B90B] font-bold border border-[#F0B90B]/30'
+                              : 'text-[#EAECEF] hover:bg-[#2B2F36]'
                           }`}
                         >
                           <span>{snd.icon}</span>
@@ -277,22 +261,22 @@ export const Header: React.FC<HeaderProps> = ({
               <Globe className="w-3.5 h-3.5 text-[#F0B90B] ml-1 mr-0.5 hidden sm:block" />
               <button
                 type="button"
-                onClick={() => handleToggleLanguage("en")}
+                onClick={() => handleToggleLanguage('en')}
                 className={`px-2 py-0.5 rounded font-mono text-[11px] font-bold transition ${
-                  language === "en"
-                    ? "bg-[#F0B90B] text-slate-950 shadow"
-                    : "text-[#848E9C] hover:text-[#EAECEF] hover:bg-[#2B2F36]"
+                  language === 'en'
+                    ? 'bg-[#F0B90B] text-slate-950 shadow'
+                    : 'text-[#848E9C] hover:text-[#EAECEF] hover:bg-[#2B2F36]'
                 }`}
               >
                 🇺🇸 EN
               </button>
               <button
                 type="button"
-                onClick={() => handleToggleLanguage("es")}
+                onClick={() => handleToggleLanguage('es')}
                 className={`px-2 py-0.5 rounded font-mono text-[11px] font-bold transition ${
-                  language === "es"
-                    ? "bg-[#F0B90B] text-slate-950 shadow"
-                    : "text-[#848E9C] hover:text-[#EAECEF] hover:bg-[#2B2F36]"
+                  language === 'es'
+                    ? 'bg-[#F0B90B] text-slate-950 shadow'
+                    : 'text-[#848E9C] hover:text-[#EAECEF] hover:bg-[#2B2F36]'
                 }`}
               >
                 🇪🇸 ES
@@ -300,11 +284,18 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Account & Subscription Control */}
-            <div className="relative">
+            <div className="sm:relative overflow-visible">
               {isPremium ? (
                 <button
                   type="button"
-                  onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
+                  onClick={() => {
+                    const next = !isAccountMenuOpen;
+                    setIsAccountMenuOpen(next);
+                    if (next) {
+                      setIsShieldPopoverOpen(false);
+                      setIsSoundPickerOpen(false);
+                    }
+                  }}
                   className="px-2.5 py-1.5 rounded-lg bg-[#F0B90B] hover:bg-[#fcd535] text-slate-950 font-mono font-black text-xs flex items-center gap-1.5 transition"
                 >
                   <Crown className="w-3.5 h-3.5" />
@@ -314,12 +305,17 @@ export const Header: React.FC<HeaderProps> = ({
               ) : user ? (
                 <button
                   type="button"
-                  onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
+                  onClick={() => {
+                    const next = !isAccountMenuOpen;
+                    setIsAccountMenuOpen(next);
+                    if (next) {
+                      setIsShieldPopoverOpen(false);
+                      setIsSoundPickerOpen(false);
+                    }
+                  }}
                   className="px-2.5 py-1.5 rounded-lg bg-[#181A20] border border-[#2B2F36] hover:border-[#F0B90B] text-[#EAECEF] font-mono text-xs flex items-center gap-1.5 transition"
                 >
-                  <span className="font-bold text-[#848E9C]">
-                    {t.hdrFreeShort}
-                  </span>
+                  <span className="font-bold text-[#848E9C]">{t.hdrFreeShort}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-[#848E9C]" />
                 </button>
               ) : (
@@ -345,26 +341,20 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Account Dropdown */}
               {isAccountMenuOpen && (
-                <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-[calc(100vw-2rem)] max-w-xs sm:w-64 bg-[#181A20] border border-[#2B2F36] rounded-xl shadow-2xl z-50 p-3 font-mono text-xs space-y-3">
+                <div className="absolute top-full left-4 right-4 mt-2 sm:left-auto sm:right-0 sm:w-72 z-50 max-h-[75vh] overflow-y-auto bg-[#181A20] border border-[#2B2F36] rounded-xl shadow-2xl p-3 font-mono text-xs space-y-3">
                   <div className="flex items-center gap-2 border-b border-[#2B2F36] pb-2">
                     <div
                       className={`p-1.5 rounded-lg ${
-                        isPremium
-                          ? "bg-[#F0B90B] text-slate-950"
-                          : "bg-[#2B2F36] text-[#848E9C]"
+                        isPremium ? 'bg-[#F0B90B] text-slate-950' : 'bg-[#2B2F36] text-[#848E9C]'
                       }`}
                     >
                       <ShieldCheck className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
                       <div className="font-bold text-[#EAECEF] truncate">
-                        {userProfile?.displayName ||
-                          user?.email?.split("@")[0] ||
-                          "Trader"}
+                        {userProfile?.displayName || user?.email?.split('@')[0] || 'Trader'}
                       </div>
-                      <div className="text-[10px] text-[#848E9C] truncate">
-                        {user?.email || ""}
-                      </div>
+                      <div className="text-[10px] text-[#848E9C] truncate">{user?.email || ''}</div>
                     </div>
                   </div>
 
@@ -373,9 +363,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>{t.hdrTierLabel}</span>
                       <span
                         className={`font-bold px-1.5 py-0.5 rounded ${
-                          isPremium
-                            ? "bg-[#F0B90B] text-slate-950"
-                            : "bg-[#2B2F36] text-[#848E9C]"
+                          isPremium ? 'bg-[#F0B90B] text-slate-950' : 'bg-[#2B2F36] text-[#848E9C]'
                         }`}
                       >
                         {isPremium ? t.hdrProShort : t.hdrFreeShort}
@@ -385,9 +373,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <div className="flex justify-between items-center text-[#848E9C] pt-1">
                         <span>{t.hdrExpiresLabel}</span>
                         <span className="text-[#EAECEF] font-semibold">
-                          {new Date(
-                            userProfile.subscription_expires_at,
-                          ).toLocaleDateString()}
+                          {new Date(userProfile.subscription_expires_at).toLocaleDateString()}
                         </span>
                       </div>
                     )}
@@ -401,16 +387,14 @@ export const Header: React.FC<HeaderProps> = ({
                     }}
                     className={`w-full py-1.5 px-2.5 rounded-lg text-xs font-bold flex items-center justify-between transition border ${
                       userProfile?.is_telegram_linked
-                        ? "bg-[#0088cc]/15 border-[#0088cc]/40 text-[#0088cc]"
-                        : "bg-[#121418] border-[#2B2F36] text-[#EAECEF] hover:bg-[#2B2F36]"
+                        ? 'bg-[#0088cc]/15 border-[#0088cc]/40 text-[#0088cc]'
+                        : 'bg-[#121418] border-[#2B2F36] text-[#EAECEF] hover:bg-[#2B2F36]'
                     }`}
                   >
                     <span className="flex items-center gap-1.5">
                       <Send className="w-3.5 h-3.5 text-[#0088cc]" />
                       <span>
-                        {userProfile?.is_telegram_linked
-                          ? t.hdrTelegramLinked
-                          : t.hdrTelegramConnect}
+                        {userProfile?.is_telegram_linked ? t.hdrTelegramLinked : t.hdrTelegramConnect}
                       </span>
                     </span>
                     <Clock className="w-3 h-3 opacity-50" />

@@ -8,15 +8,9 @@
         "id": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
-        "subscription_tier": {
-          "type": "string",
-          "enum": ["free", "pro", "premium"]
-        },
+        "subscription_tier": { "type": "string", "enum": ["free", "pro", "premium"] },
         "subscription_expires_at": { "type": ["number", "string"] },
-        "payment_status": {
-          "type": "string",
-          "enum": ["active", "inactive", "expired"]
-        },
+        "payment_status": { "type": "string", "enum": ["active", "inactive", "expired"] },
         "created_at": { "type": "string" },
         "telegram_chat_id": { "type": "string" },
         "telegram_username": { "type": "string" },
@@ -53,16 +47,7 @@
         "timeElapsedMs": { "type": "number" },
         "updatedAt": { "type": "number" }
       },
-      "required": [
-        "id",
-        "symbol",
-        "type",
-        "targetHit",
-        "entryPrice",
-        "exitPrice",
-        "profitPct",
-        "hitAt"
-      ]
+      "required": ["id", "symbol", "type", "targetHit", "entryPrice", "exitPrice", "profitPct", "hitAt"]
     }
   }
 }

@@ -484,7 +484,7 @@ export const BuySignalScanner: React.FC<BuySignalScannerProps> = ({
 
               {/* Audio Settings Popover Menu */}
               {isSoundSettingsOpen && (
-                <div className="absolute right-0 top-full mt-2 w-72 sm:w-84 bg-[#14161C] border border-[#2B2F36] rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-[100] space-y-3.5 backdrop-blur-md">
+                <div className="fixed top-28 left-4 right-4 sm:absolute sm:top-full sm:left-auto sm:right-0 sm:mt-2 sm:w-72 max-h-[75vh] overflow-y-auto bg-[#14161C] border border-[#2B2F36] rounded-2xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-50 space-y-3.5 backdrop-blur-md">
                   <div className="flex items-center justify-between border-b border-[#2B2F36] pb-2">
                     <span className="text-xs font-mono font-bold text-[#EAECEF] flex items-center gap-1.5">
                       <Volume2 className="w-4 h-4 text-[#0ECB81]" />
