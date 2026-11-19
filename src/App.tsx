@@ -239,7 +239,7 @@ function MainApp() {
   };
 
   // ===========================================================================
-  // PUBLIC ROOT ROUTE ("/"): CRYPTOMUS-COMPLIANT COMMERCIAL LANDING PAGE
+  // PUBLIC ROOT ROUTE ("/"): COMMERCIAL LANDING PAGE
   // ===========================================================================
   if (currentRoute === "/") {
     return (

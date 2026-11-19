@@ -1,14 +1,14 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
-  User 
-} from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../services/firebase';
-import { UserProfile, SubscriptionTier } from '../types';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  User,
+} from "firebase/auth";
+import { doc, getDoc, setDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { auth, db } from "../services/firebase";
+import { UserProfile, SubscriptionTier } from "../types";
 
 interface AuthContextType {
   user: User | null;
@@ -17,44 +17,59 @@ interface AuthContextType {
   subscriptionTier: SubscriptionTier;
   isPremium: boolean;
   login: (email: string, pass: string) => Promise<void>;
-  register: (email: string, pass: string, displayName?: string) => Promise<void>;
+  register: (
+    email: string,
+    pass: string,
+    displayName?: string,
+  ) => Promise<void>;
   logout: () => Promise<void>;
-  upgradeToPremium: (plan?: 'monthly' | 'semiannual' | 'annual') => Promise<void>;
+  upgradeToPremium: (
+    plan?: "monthly" | "semiannual" | "annual",
+  ) => Promise<void>;
   downgradeToFree: () => Promise<void>;
   linkTelegramAccount: (chatId: string, username?: string) => Promise<void>;
   unlinkTelegramAccount: () => Promise<void>;
   updateTrackedSymbols: (symbols: string[]) => Promise<void>;
-  updateLanguagePreference: (lang: 'es' | 'en') => Promise<void>;
+  updateLanguagePreference: (lang: "es" | "en") => Promise<void>;
   openAuthModal: () => void;
   closeAuthModal: () => void;
   isAuthModalOpen: boolean;
-  authModalMode: 'login' | 'register';
-  setAuthModalMode: (mode: 'login' | 'register') => void;
+  authModalMode: "login" | "register";
+  setAuthModalMode: (mode: "login" | "register") => void;
   openSubscriptionModal: () => void;
   closeSubscriptionModal: () => void;
   isSubscriptionModalOpen: boolean;
-  openCheckoutModal: (plan?: 'monthly' | 'semiannual' | 'annual') => void;
+  openCheckoutModal: (plan?: "monthly" | "semiannual" | "annual") => void;
   closeCheckoutModal: () => void;
   isCheckoutModalOpen: boolean;
-  checkoutModalPlan: 'monthly' | 'semiannual' | 'annual';
+  checkoutModalPlan: "monthly" | "semiannual" | "annual";
   isTelegramModalOpen: boolean;
   setIsTelegramModalOpen: (open: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  
+
   // Modals state
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
-  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState<boolean>(false);
-  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState<boolean>(false);
-  const [checkoutModalPlan, setCheckoutModalPlan] = useState<'monthly' | 'semiannual' | 'annual'>('annual');
-  const [isTelegramModalOpen, setIsTelegramModalOpen] = useState<boolean>(false);
+  const [authModalMode, setAuthModalMode] = useState<"login" | "register">(
+    "login",
+  );
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] =
+    useState<boolean>(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] =
+    useState<boolean>(false);
+  const [checkoutModalPlan, setCheckoutModalPlan] = useState<
+    "monthly" | "semiannual" | "annual"
+  >("annual");
+  const [isTelegramModalOpen, setIsTelegramModalOpen] =
+    useState<boolean>(false);
 
   // Sync auth state with real-time Firestore onSnapshot listener
   useEffect(() => {
@@ -70,13 +85,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(currentUser);
       if (currentUser) {
         try {
-          const userDocRef = doc(db, 'users', currentUser.uid);
-          
-          const resolveInitialLang = (): 'es' | 'en' => {
-            const saved = localStorage.getItem('sentinel_language');
-            if (saved === 'es' || saved === 'en') return saved;
-            if (typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('en')) return 'en';
-            return 'es';
+          const userDocRef = doc(db, "users", currentUser.uid);
+
+          const resolveInitialLang = (): "es" | "en" => {
+            const saved = localStorage.getItem("sentinel_language");
+            if (saved === "es" || saved === "en") return saved;
+            if (
+              typeof navigator !== "undefined" &&
+              navigator.language?.toLowerCase().startsWith("en")
+            )
+              return "en";
+            return "es";
           };
 
           // Check if document exists, initialize default if missing
@@ -84,11 +103,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!docSnap.exists()) {
             const newProfile: UserProfile = {
               uid: currentUser.uid,
-              email: currentUser.email || '',
-              displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Trader',
-              subscription_tier: 'free',
+              email: currentUser.email || "",
+              displayName:
+                currentUser.displayName ||
+                currentUser.email?.split("@")[0] ||
+                "Trader",
+              subscription_tier: "free",
               created_at: new Date().toISOString(),
-              language_preference: resolveInitialLang()
+              language_preference: resolveInitialLang(),
             };
             await setDoc(userDocRef, newProfile);
             setUserProfile(newProfile);
@@ -97,28 +119,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           // Real-time listener: eliminates manual polling for webhook tier upgrades
-          profileUnsubscribe = onSnapshot(userDocRef, (snap) => {
-            if (snap.exists()) {
-              const updatedData = snap.data() as UserProfile;
-              setUserProfile(updatedData);
-            }
-          }, (err) => {
-            console.error('[Auth] Real-time profile sync error:', err);
-          });
+          profileUnsubscribe = onSnapshot(
+            userDocRef,
+            (snap) => {
+              if (snap.exists()) {
+                const updatedData = snap.data() as UserProfile;
+                setUserProfile(updatedData);
+              }
+            },
+            (err) => {
+              console.error("[Auth] Real-time profile sync error:", err);
+            },
+          );
         } catch (err) {
-          console.warn('[Auth] User profile Firestore sync fallback (using local state):', err);
+          console.warn(
+            "[Auth] User profile Firestore sync fallback (using local state):",
+            err,
+          );
           setUserProfile({
             uid: currentUser.uid,
-            email: currentUser.email || '',
-            subscription_tier: 'free',
+            email: currentUser.email || "",
+            subscription_tier: "free",
             created_at: new Date().toISOString(),
             language_preference: (() => {
               try {
-                const saved = localStorage.getItem('sentinel_language');
-                if (saved === 'en' || saved === 'es') return saved;
-              } catch { /* ignore */ }
-              return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('en') ? 'en' : 'es';
-            })()
+                const saved = localStorage.getItem("sentinel_language");
+                if (saved === "en" || saved === "es") return saved;
+              } catch {
+                /* ignore */
+              }
+              return typeof navigator !== "undefined" &&
+                navigator.language?.toLowerCase().startsWith("en")
+                ? "en"
+                : "es";
+            })(),
           });
         }
       } else {
@@ -140,23 +174,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthModalOpen(false);
   };
 
-  const register = async (email: string, pass: string, displayName?: string) => {
+  const register = async (
+    email: string,
+    pass: string,
+    displayName?: string,
+  ) => {
     const res = await createUserWithEmailAndPassword(auth, email, pass);
-    const savedLang = (localStorage.getItem('sentinel_language') as 'es' | 'en') ||
-      (typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('en') ? 'en' : 'es');
+    const savedLang =
+      (localStorage.getItem("sentinel_language") as "es" | "en") ||
+      (typeof navigator !== "undefined" &&
+      navigator.language?.toLowerCase().startsWith("en")
+        ? "en"
+        : "es");
 
     const newProfile: UserProfile = {
       uid: res.user.uid,
       email: res.user.email || email,
-      displayName: displayName || email.split('@')[0],
-      subscription_tier: 'free',
+      displayName: displayName || email.split("@")[0],
+      subscription_tier: "free",
       created_at: new Date().toISOString(),
-      language_preference: savedLang
+      language_preference: savedLang,
     };
     try {
-      await setDoc(doc(db, 'users', res.user.uid), newProfile);
+      await setDoc(doc(db, "users", res.user.uid), newProfile);
     } catch (e) {
-      console.warn('Firestore setDoc failed, setting in memory', e);
+      console.warn("Firestore setDoc failed, setting in memory", e);
     }
     setUserProfile(newProfile);
     setIsAuthModalOpen(false);
@@ -167,9 +209,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUserProfile(null);
   };
 
-  const upgradeToPremium = async (plan: 'monthly' | 'semiannual' | 'annual' = 'monthly') => {
+  const upgradeToPremium = async (
+    plan: "monthly" | "semiannual" | "annual" = "monthly",
+  ) => {
     // Client-side direct Firestore tier upgrades are disabled for security.
-    // Open the Cryptomus checkout flow for verified server-side activation.
+    // Open the OxaPay checkout flow for verified server-side activation.
     setIsSubscriptionModalOpen(false);
     setCheckoutModalPlan(plan);
     setIsCheckoutModalOpen(true);
@@ -177,202 +221,233 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const downgradeToFree = async () => {
     if (user && userProfile) {
-      const userDocRef = doc(db, 'users', user.uid);
+      const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, {
-        subscription_tier: 'free',
-        payment_status: 'inactive',
-        subscription_expires_at: undefined
+        subscription_tier: "free",
+        payment_status: "inactive",
+        subscription_expires_at: undefined,
       });
-      setUserProfile(prev => prev ? {
-        ...prev,
-        subscription_tier: 'free',
-        payment_status: 'inactive',
-        subscription_expires_at: undefined
-      } : null);
+      setUserProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              subscription_tier: "free",
+              payment_status: "inactive",
+              subscription_expires_at: undefined,
+            }
+          : null,
+      );
     } else {
-      setUserProfile(prev => prev ? {
-        ...prev,
-        subscription_tier: 'free',
-        payment_status: 'inactive',
-        subscription_expires_at: undefined
-      } : null);
+      setUserProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              subscription_tier: "free",
+              payment_status: "inactive",
+              subscription_expires_at: undefined,
+            }
+          : null,
+      );
     }
   };
 
   const linkTelegramAccount = async (chatId: string, username?: string) => {
     const cleanChatId = chatId.trim();
-    const cleanUsername = username ? username.trim().replace(/^@/, '') : '';
+    const cleanUsername = username ? username.trim().replace(/^@/, "") : "";
     const now = new Date().toISOString();
 
     if (user) {
-      const userDocRef = doc(db, 'users', user.uid);
+      const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, {
         telegram_chat_id: cleanChatId,
         telegram_username: cleanUsername,
         telegram_linked_at: now,
-        is_telegram_linked: true
+        is_telegram_linked: true,
       });
     }
 
-    setUserProfile(prev => prev ? {
-      ...prev,
-      telegram_chat_id: cleanChatId,
-      telegram_username: cleanUsername,
-      telegram_linked_at: now,
-      is_telegram_linked: true
-    } : {
-      uid: user?.uid || 'guest-demo-id',
-      email: user?.email || 'trader@sentinel.node',
-      subscription_tier: 'free',
-      created_at: now,
-      telegram_chat_id: cleanChatId,
-      telegram_username: cleanUsername,
-      telegram_linked_at: now,
-      is_telegram_linked: true
-    });
+    setUserProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            telegram_chat_id: cleanChatId,
+            telegram_username: cleanUsername,
+            telegram_linked_at: now,
+            is_telegram_linked: true,
+          }
+        : {
+            uid: user?.uid || "guest-demo-id",
+            email: user?.email || "trader@sentinel.node",
+            subscription_tier: "free",
+            created_at: now,
+            telegram_chat_id: cleanChatId,
+            telegram_username: cleanUsername,
+            telegram_linked_at: now,
+            is_telegram_linked: true,
+          },
+    );
 
     // Notify backend endpoint of telegram linking
     try {
       const idToken = user ? await user.getIdToken().catch(() => null) : null;
-      await fetch('/api/telegram/link-bot', {
-        method: 'POST',
+      await fetch("/api/telegram/link-bot", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {})
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
         body: JSON.stringify({
-          userId: user?.uid || 'guest-demo-id',
+          userId: user?.uid || "guest-demo-id",
           chatId: cleanChatId,
           username: cleanUsername,
-          trackedSymbols: userProfile?.tracked_symbols || ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
-        })
+          trackedSymbols: userProfile?.tracked_symbols || [
+            "BTCUSDT",
+            "ETHUSDT",
+            "SOLUSDT",
+          ],
+        }),
       });
     } catch (e) {
-      console.warn('[Telegram Link] Backend notification warning:', e);
+      console.warn("[Telegram Link] Backend notification warning:", e);
     }
   };
 
   const unlinkTelegramAccount = async () => {
     if (user) {
-      const userDocRef = doc(db, 'users', user.uid);
+      const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, {
-        telegram_chat_id: '',
-        telegram_username: '',
+        telegram_chat_id: "",
+        telegram_username: "",
         telegram_linked_at: undefined,
-        is_telegram_linked: false
+        is_telegram_linked: false,
       });
     }
 
-    setUserProfile(prev => prev ? {
-      ...prev,
-      telegram_chat_id: '',
-      telegram_username: '',
-      telegram_linked_at: undefined,
-      is_telegram_linked: false
-    } : null);
+    setUserProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            telegram_chat_id: "",
+            telegram_username: "",
+            telegram_linked_at: undefined,
+            is_telegram_linked: false,
+          }
+        : null,
+    );
   };
 
   const updateTrackedSymbols = async (symbols: string[]) => {
     const cleanSymbols = Array.from(
       new Set(
         symbols
-          .map(s => String(s || '').toUpperCase().trim())
+          .map((s) =>
+            String(s || "")
+              .toUpperCase()
+              .trim(),
+          )
           .filter(Boolean)
-          .map(s => (s.endsWith('USDT') ? s : `${s}USDT`))
-      )
+          .map((s) => (s.endsWith("USDT") ? s : `${s}USDT`)),
+      ),
     );
     try {
-      localStorage.setItem('sentinel_tracked_symbols', JSON.stringify(cleanSymbols));
+      localStorage.setItem(
+        "sentinel_tracked_symbols",
+        JSON.stringify(cleanSymbols),
+      );
     } catch {
       // ignore storage quota errors
     }
 
-    if (user && user.uid !== 'guest-demo-id') {
+    if (user && user.uid !== "guest-demo-id") {
       try {
-        const userDocRef = doc(db, 'users', user.uid);
+        const userDocRef = doc(db, "users", user.uid);
         await updateDoc(userDocRef, {
-          tracked_symbols: cleanSymbols
+          tracked_symbols: cleanSymbols,
         });
       } catch (err) {
-        console.warn('[Firestore Update Tracked Symbols Warning]', err);
+        console.warn("[Firestore Update Tracked Symbols Warning]", err);
       }
     }
 
-    setUserProfile(prev => prev ? {
-      ...prev,
-      tracked_symbols: cleanSymbols
-    } : {
-      uid: user?.uid || 'guest-demo-id',
-      email: user?.email || 'trader@sentinel.node',
-      displayName: 'Trader',
-      subscription_tier: 'free',
-      created_at: new Date().toISOString(),
-      tracked_symbols: cleanSymbols
-    });
+    setUserProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            tracked_symbols: cleanSymbols,
+          }
+        : {
+            uid: user?.uid || "guest-demo-id",
+            email: user?.email || "trader@sentinel.node",
+            displayName: "Trader",
+            subscription_tier: "free",
+            created_at: new Date().toISOString(),
+            tracked_symbols: cleanSymbols,
+          },
+    );
 
     // Synchronize directly with backend 24/7 background scanner & Binance ingestion loop
     try {
       const idToken = user ? await user.getIdToken().catch(() => null) : null;
       const authHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {})
+        "Content-Type": "application/json",
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
       };
       await Promise.all([
-        fetch('/api/symbols/sync', {
-          method: 'POST',
+        fetch("/api/symbols/sync", {
+          method: "POST",
           headers: authHeaders,
           body: JSON.stringify({
             userId: user?.uid || userProfile?.uid,
             chatId: userProfile?.telegram_chat_id,
             symbols: cleanSymbols,
-            tracked_symbols: cleanSymbols
-          })
+            tracked_symbols: cleanSymbols,
+          }),
         }),
-        fetch('/api/telegram/update-tracked-symbols', {
-          method: 'POST',
+        fetch("/api/telegram/update-tracked-symbols", {
+          method: "POST",
           headers: authHeaders,
           body: JSON.stringify({
             userId: user?.uid || userProfile?.uid,
             chatId: userProfile?.telegram_chat_id,
-            tracked_symbols: cleanSymbols
-          })
-        })
+            tracked_symbols: cleanSymbols,
+          }),
+        }),
       ]);
     } catch (e) {
-      console.warn('[Tracked Symbols Sync Error]', e);
+      console.warn("[Tracked Symbols Sync Error]", e);
     }
   };
 
-  const updateLanguagePreference = async (lang: 'es' | 'en') => {
-    const cleanLang: 'es' | 'en' = lang === 'en' ? 'en' : 'es';
+  const updateLanguagePreference = async (lang: "es" | "en") => {
+    const cleanLang: "es" | "en" = lang === "en" ? "en" : "es";
 
     // 1. Always update local profile state immediately so UI/modals never stall or revert
-    setUserProfile(prev => {
+    setUserProfile((prev) => {
       if (prev) {
         return { ...prev, language_preference: cleanLang };
       }
       if (!user) return null;
       return {
         uid: user.uid,
-        email: user.email || '',
-        displayName: user.displayName || user.email?.split('@')[0] || 'Trader',
-        subscription_tier: 'free',
+        email: user.email || "",
+        displayName: user.displayName || user.email?.split("@")[0] || "Trader",
+        subscription_tier: "free",
         created_at: new Date().toISOString(),
-        language_preference: cleanLang
+        language_preference: cleanLang,
       };
     });
 
     // 2. Targeted Firestore update (never overwrite whole profile or use set/merge) wrapped in try/catch
-    if (user?.uid && user.uid !== 'guest-demo-id') {
+    if (user?.uid && user.uid !== "guest-demo-id") {
       try {
-        const userDocRef = doc(db, 'users', user.uid);
+        const userDocRef = doc(db, "users", user.uid);
         await updateDoc(userDocRef, {
-          language_preference: cleanLang
+          language_preference: cleanLang,
         });
       } catch (err: any) {
         console.warn(
-          '[Firestore Language Sync] Could not update language_preference in Firestore (local UI preference preserved):',
-          err?.code || err?.message || err
+          "[Firestore Language Sync] Could not update language_preference in Firestore (local UI preference preserved):",
+          err?.code || err?.message || err,
         );
       }
     }
@@ -380,39 +455,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 3. Quietly synchronize active Telegram background dispatcher if linked/authenticated
     const activeUid = user?.uid || userProfile?.uid;
     const activeChatId = userProfile?.telegram_chat_id;
-    if ((activeUid && activeUid !== 'guest-demo-id') || activeChatId) {
+    if ((activeUid && activeUid !== "guest-demo-id") || activeChatId) {
       try {
         const idToken = user ? await user.getIdToken().catch(() => null) : null;
-        await fetch('/api/telegram/update-language', {
-          method: 'POST',
+        await fetch("/api/telegram/update-language", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {})
+            "Content-Type": "application/json",
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
           },
           body: JSON.stringify({
             userId: activeUid,
             chatId: activeChatId,
             language: cleanLang,
-            language_preference: cleanLang
-          })
+            language_preference: cleanLang,
+          }),
         });
       } catch (e) {
-        console.warn('[Language Preference Sync Warning]', e);
+        console.warn("[Language Preference Sync Warning]", e);
       }
     }
   };
 
-  const subscriptionTier: SubscriptionTier = userProfile?.subscription_tier || 'free';
-  const isPaidTier = subscriptionTier === 'pro' || subscriptionTier === 'premium';
-  const isPaymentActive = userProfile?.payment_status !== 'inactive' && userProfile?.payment_status !== 'expired';
+  const subscriptionTier: SubscriptionTier =
+    userProfile?.subscription_tier || "free";
+  const isPaidTier =
+    subscriptionTier === "pro" || subscriptionTier === "premium";
+  const isPaymentActive =
+    userProfile?.payment_status !== "inactive" &&
+    userProfile?.payment_status !== "expired";
   const expRaw = userProfile?.subscription_expires_at;
   const expMs =
-    expRaw !== undefined && expRaw !== null && expRaw !== ''
-      ? typeof expRaw === 'number' || /^\d+$/.test(String(expRaw))
+    expRaw !== undefined && expRaw !== null && expRaw !== ""
+      ? typeof expRaw === "number" || /^\d+$/.test(String(expRaw))
         ? Number(expRaw)
         : new Date(String(expRaw)).getTime()
       : null;
-  const isNotExpired = expMs === null || !Number.isFinite(expMs) || expMs > Date.now();
+  const isNotExpired =
+    expMs === null || !Number.isFinite(expMs) || expMs > Date.now();
   const isPremium = isPaidTier && isPaymentActive && isNotExpired;
 
   return (
@@ -440,7 +520,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         openSubscriptionModal: () => setIsSubscriptionModalOpen(true),
         closeSubscriptionModal: () => setIsSubscriptionModalOpen(false),
         isSubscriptionModalOpen,
-        openCheckoutModal: (plan: 'monthly' | 'semiannual' | 'annual' = 'annual') => {
+        openCheckoutModal: (
+          plan: "monthly" | "semiannual" | "annual" = "annual",
+        ) => {
           setCheckoutModalPlan(plan);
           setIsCheckoutModalOpen(true);
         },
@@ -459,7 +541,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

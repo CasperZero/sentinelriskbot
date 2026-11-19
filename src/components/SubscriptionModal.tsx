@@ -13,7 +13,6 @@ import {
   RefreshCw,
   AlertCircle,
   Globe,
-  Clock,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -22,7 +21,6 @@ export const SubscriptionModal: React.FC = () => {
   const {
     isSubscriptionModalOpen,
     closeSubscriptionModal,
-    openCheckoutModal,
     openAuthModal,
     user,
     userProfile,
@@ -40,18 +38,9 @@ export const SubscriptionModal: React.FC = () => {
     { title: t.subFeature5Title, description: t.subFeature5Desc },
   ];
 
-  const [selectedPlan, setSelectedPlan] = useState<
-    "monthly" | "semiannual" | "annual"
-  >("monthly");
-  const [cryptomusActive, setCryptomusActive] = useState<boolean>(() => {
-    const envStatus = String(
-      (import.meta as any).env?.VITE_CRYPTOMUS_STATUS || "",
-    ).toUpperCase();
-    if (envStatus.includes("PENDIENTE")) return false;
-    return false;
-  });
   const [mpPriceArs, setMpPriceArs] = useState<number>(38000);
   const [mpLoading, setMpLoading] = useState<boolean>(false);
+  const [oxaLoading, setOxaLoading] = useState<boolean>(false);
   const [gatewayError, setGatewayError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,14 +51,6 @@ export const SubscriptionModal: React.FC = () => {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
-        const envStatus = String(
-          (import.meta as any).env?.VITE_CRYPTOMUS_STATUS || "",
-        ).toUpperCase();
-        if (envStatus.includes("PENDIENTE")) {
-          setCryptomusActive(false);
-        } else {
-          setCryptomusActive(Boolean(data.cryptomusActive));
-        }
         if (Number(data.mpProPriceArs) > 0) {
           setMpPriceArs(Number(data.mpProPriceArs));
         }
@@ -83,13 +64,6 @@ export const SubscriptionModal: React.FC = () => {
   }, [isSubscriptionModalOpen]);
 
   if (!isSubscriptionModalOpen) return null;
-
-  const selectedPrice =
-    selectedPlan === "monthly"
-      ? "29"
-      : selectedPlan === "semiannual"
-        ? "149"
-        : "249";
 
   const rawWhopBaseUrl = String(
     (import.meta as any).env?.VITE_WHOP_CHECKOUT_URL ||
@@ -152,15 +126,46 @@ export const SubscriptionModal: React.FC = () => {
     }
   };
 
-  const handleCryptomusCheckout = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!cryptomusActive) return;
-    if (!user) {
+  const handleOxaPayCheckout = async () => {
+    if (!user || !user.uid) {
       handleRequireAuth();
       return;
     }
-    closeSubscriptionModal();
-    openCheckoutModal(selectedPlan);
+
+    setOxaLoading(true);
+    setGatewayError(null);
+    try {
+      const idToken = await user.getIdToken().catch(() => null);
+      const res = await fetch("/api/payments/oxapay/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({}),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.paymentUrl) {
+        throw new Error(
+          data?.error ||
+            (isEs
+              ? "No se pudo generar la factura cripto con OxaPay. Por favor intente nuevamente."
+              : "Could not generate OxaPay crypto invoice. Please try again."),
+        );
+      }
+
+      window.location.href = data.paymentUrl;
+    } catch (err: any) {
+      setGatewayError(
+        err?.message ||
+          (isEs
+            ? "Error al conectar con la pasarela cripto OxaPay"
+            : "Error connecting to OxaPay crypto gateway"),
+      );
+    } finally {
+      setOxaLoading(false);
+    }
   };
 
   return (
@@ -378,83 +383,65 @@ export const SubscriptionModal: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* OPTION C: Crypto (USDT, BTC, ETH — Cryptomus) */}
-                  <form
-                    onSubmit={handleCryptomusCheckout}
-                    className="p-3.5 bg-[#181A20] rounded-xl border border-[#2B2F36] space-y-3"
-                  >
+                  {/* OPTION C: Crypto (USDT / BTC / ETH — OxaPay) */}
+                  <div className="p-3.5 bg-[#181A20] rounded-xl border border-emerald-500/30 hover:border-emerald-400/60 transition space-y-3">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
-                        <div
-                          className={`p-2 rounded-lg border ${cryptomusActive ? "bg-[#F0B90B]/15 text-[#F0B90B] border-[#F0B90B]/30" : "bg-[#2B2F36]/50 text-[#848E9C] border-[#2B2F36]"}`}
-                        >
+                        <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                           <Coins className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="text-xs font-extrabold text-[#EAECEF] flex items-center gap-2 flex-wrap">
                             <span>
                               {isEs
-                                ? "Cripto (USDT, BTC, ETH — Cryptomus)"
-                                : "Crypto (USDT, BTC, ETH — Cryptomus)"}
+                                ? "Cripto (USDT / BTC / ETH — OxaPay)"
+                                : "Crypto (USDT / BTC / ETH — OxaPay)"}
                             </span>
-                            {cryptomusActive ? (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/30">
-                                USDT • BTC • ETH • SOL
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                <span>
-                                  {isEs ? "Próximamente" : "Coming Soon"}
-                                </span>
-                              </span>
-                            )}
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              USDT • BTC • ETH • SOL
+                            </span>
                           </div>
                           <p className="text-[11px] text-[#848E9C] font-sans mt-0.5">
-                            {cryptomusActive
-                              ? isEs
-                                ? "Paga en la blockchain con USDT (TRC-20 / BEP-20), Bitcoin, Ethereum o Solana."
-                                : "Pay on-chain with USDT (TRC-20 / BEP-20), Bitcoin, Ethereum, or Solana."
-                              : isEs
-                                ? "Pasarela cripto en verificación final de comercio. Usa Tarjeta/Apple Pay o Mercado Pago arriba para acceso inmediato."
-                                : "On-chain crypto gateway undergoing final merchant review. Use Card/Apple Pay or Mercado Pago above for instant access."}
+                            {isEs
+                              ? "Paga al instante en la blockchain con USDT (TRC-20 / BEP-20 / Polygon), Bitcoin, Ethereum o Solana vía OxaPay."
+                              : "Pay instantly on-chain with USDT (TRC-20 / BEP-20 / Polygon), Bitcoin, Ethereum, or Solana via OxaPay."}
                           </p>
                         </div>
                       </div>
                     </div>
 
-                    {cryptomusActive ? (
-                      <button
-                        type="submit"
-                        className="w-full py-2.5 px-4 bg-[#2B2F36] hover:bg-[#F0B90B] text-[#EAECEF] hover:text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition"
-                      >
-                        <Coins className="w-4 h-4" />
-                        <span>
-                          {!user
-                            ? isEs
-                              ? `INICIAR SESIÓN Y PAGAR $${selectedPrice} CON CRIPTO`
-                              : `SIGN IN & PAY $${selectedPrice} WITH CRYPTO`
-                            : isEs
-                              ? `PAGAR $${selectedPrice} CON CRYPTOMUS (CRIPTO)`
-                              : `PAY $${selectedPrice} WITH CRYPTOMUS (CRYPTO)`}
-                        </span>
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="w-full py-2.5 px-4 bg-[#121418] text-[#848E9C] border border-[#2B2F36] font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
-                      >
-                        <Clock className="w-3.5 h-3.5 text-amber-400" />
-                        <span>
-                          {isEs
-                            ? "CRYPTOMUS CRIPTO — PRÓXIMAMENTE"
-                            : "CRYPTOMUS CRYPTO — COMING SOON"}
-                        </span>
-                      </button>
-                    )}
-                  </form>
+                    <button
+                      type="button"
+                      onClick={handleOxaPayCheckout}
+                      disabled={oxaLoading}
+                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-500/20"
+                    >
+                      {oxaLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>
+                            {isEs
+                              ? "CONECTANDO CON OXAPAY..."
+                              : "REDIRECTING TO OXAPAY..."}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Coins className="w-4 h-4" />
+                          <span>
+                            {!user
+                              ? isEs
+                                ? "INICIAR SESIÓN Y PAGAR CON CRIPTO (USDT / BTC / ETH)"
+                                : "SIGN IN & PAY WITH CRYPTO (USDT / BTC / ETH)"
+                              : isEs
+                                ? "PAGAR CON CRIPTO (USDT / BTC / ETH)"
+                                : "PAY WITH CRYPTO (USDT / BTC / ETH)"}
+                          </span>
+                          <ChevronRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] text-[#848E9C] pt-1">

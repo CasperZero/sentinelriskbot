@@ -25,7 +25,13 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
   app.use(cors());
-  app.use(express.json());
+  app.use(
+    express.json({
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf.toString("utf8");
+      },
+    }),
+  );
 
   // Health check endpoint
   app.get("/api/health", (_req, res) => {
@@ -1871,73 +1877,18 @@ async function startServer() {
     });
   });
 
-  // Disabled unverified client checkout endpoint (must go through verified Cryptomus flow)
+  // Disabled unverified client checkout endpoint (must go through verified payment gateways)
   app.post("/api/payment/checkout-session", (_req, res) => {
     return res.status(403).json({
       status: "error",
       error:
-        "Unverified client-side checkout is disabled. Please complete payment via Cryptomus.",
+        "Unverified client-side checkout is disabled. Please complete payment via Whop, Mercado Pago, or OxaPay.",
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // CRYPTOMUS PAYMENT GATEWAY INTEGRATION (STRICTLY SECURED)
-  // ---------------------------------------------------------------------------
-  const CRYPTOMUS_MERCHANT_ID = process.env.CRYPTOMUS_MERCHANT_ID || "";
-  const CRYPTOMUS_API_BASE = "https://api.cryptomus.com/v1";
+  // In-memory idempotency set for processed payment orders / OxaPay track_ids
   const processedPaymentOrders = new Set<string>();
-
-  // Helper: Generate Cryptomus API Signature: MD5( base64(JSON(payload)) + PAYMENT_KEY )
-  function createCryptomusSignature(
-    payload: Record<string, any>,
-    paymentKey: string,
-  ): string {
-    const jsonStr = JSON.stringify(payload);
-    const base64Str = Buffer.from(jsonStr).toString("base64");
-    return crypto
-      .createHash("md5")
-      .update(base64Str + paymentKey)
-      .digest("hex");
-  }
-
-  // Helper: Strictly verify incoming Cryptomus webhook signature using crypto.timingSafeEqual
-  function verifyCryptomusSignature(body: any, headerSign?: string): boolean {
-    const paymentKey = process.env.CRYPTOMUS_PAYMENT_KEY;
-    if (
-      !paymentKey ||
-      !body ||
-      typeof body !== "object" ||
-      Array.isArray(body)
-    ) {
-      return false;
-    }
-
-    const incomingSignRaw = body.sign ?? headerSign;
-    if (!incomingSignRaw || typeof incomingSignRaw !== "string") {
-      return false;
-    }
-
-    const data: Record<string, any> = { ...body };
-    delete data.sign;
-
-    const jsonString = JSON.stringify(data);
-    const base64Payload = Buffer.from(jsonString).toString("base64");
-    const computedHash = crypto
-      .createHash("md5")
-      .update(base64Payload + paymentKey)
-      .digest("hex")
-      .toLowerCase();
-
-    const incomingHash = incomingSignRaw.trim().toLowerCase();
-    const computedBuf = Buffer.from(computedHash, "utf8");
-    const incomingBuf = Buffer.from(incomingHash, "utf8");
-
-    if (computedBuf.length !== incomingBuf.length) {
-      return false;
-    }
-
-    return crypto.timingSafeEqual(computedBuf, incomingBuf);
-  }
+  const processedOxapayTrackIds = new Set<string>();
 
   // Firebase Firestore Configuration & Safe Admin SDK Initialization
   const FIREBASE_PROJECT_ID =
@@ -2945,13 +2896,11 @@ async function startServer() {
     return null;
   }
 
-  function isCryptomusGatewayActive(): boolean {
-    const merchantId = (CRYPTOMUS_MERCHANT_ID || "").trim();
-    const paymentKey = (process.env.CRYPTOMUS_PAYMENT_KEY || "").trim();
-    if (!merchantId || !paymentKey) return false;
-    const upper = `${merchantId} ${paymentKey}`.toUpperCase();
+  function isOxaPayGatewayActive(): boolean {
+    const merchantKey = (process.env.OXAPAY_MERCHANT_API_KEY || "").trim();
+    if (!merchantKey) return false;
+    const upper = merchantKey.toUpperCase();
     if (
-      upper.includes("PENDIENTE_DE_REVISION") ||
       upper.includes("PENDIENTE") ||
       upper.includes("AQUI_PONES") ||
       upper.includes("YOUR_") ||
@@ -2962,6 +2911,61 @@ async function startServer() {
     return true;
   }
 
+  // Helper: Authenticate logged-in Firebase user from Authorization Bearer token
+  async function extractAuthenticatedUser(
+    req: express.Request,
+  ): Promise<{ userId: string; email: string } | null> {
+    const authHeader = String(req.headers.authorization || "").trim();
+    const idToken = authHeader.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length).trim()
+      : "";
+
+    if (idToken) {
+      // 1. Try Firebase Admin Auth verification if credentials are available
+      if (adminAppInstance && adminSdkCredentialsAvailable) {
+        try {
+          const decoded =
+            await getAdminAuth(adminAppInstance).verifyIdToken(idToken);
+          if (decoded?.uid && !isGuestOrDemoUserId(decoded.uid)) {
+            return {
+              userId: decoded.uid,
+              email: String(decoded.email || "").trim(),
+            };
+          }
+        } catch {
+          // Fallback to Identity Toolkit REST verification below
+        }
+      }
+
+      // 2. Cryptographically verify Firebase ID token via Google Identity Toolkit REST API
+      try {
+        const lookupUrl = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`;
+        const lookupRes = await fetch(lookupUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        });
+        if (lookupRes.ok) {
+          const lookupData: any = await lookupRes.json();
+          const userObj = Array.isArray(lookupData?.users)
+            ? lookupData.users[0]
+            : null;
+          const uid = String(userObj?.localId || "").trim();
+          const email = String(userObj?.email || "").trim();
+          if (uid && !isGuestOrDemoUserId(uid)) {
+            return { userId: uid, email };
+          }
+        }
+      } catch (err: any) {
+        console.warn(
+          `[IdentityToolkit Token Lookup Notice]: ${err?.message || err}`,
+        );
+      }
+    }
+
+    return null;
+  }
+
   // Gateway availability status endpoint for multi-gateway Upgrade Modal
   app.get("/api/payments/gateway-status", (_req, res) => {
     const mpPriceArs = Number(process.env.MP_PRO_PRICE_ARS) || 38000;
@@ -2970,8 +2974,10 @@ async function startServer() {
       Boolean(mpToken) &&
       !mpToken.toUpperCase().includes("PENDIENTE") &&
       !mpToken.toUpperCase().includes("YOUR_");
+    const oxaPriceUsd = Number(process.env.OXAPAY_PRO_PRICE_USD || 29);
     return res.json({
-      cryptomusActive: isCryptomusGatewayActive(),
+      oxapayActive: isOxaPayGatewayActive(),
+      oxapayPriceUsd: oxaPriceUsd,
       mercadoPagoActive: mpActive,
       mpProPriceArs: mpPriceArs,
     });
@@ -3208,424 +3214,257 @@ async function startServer() {
     return res.status(200).json({ received: true });
   });
 
-  // 1. POST /api/payments/create-invoice - Generate Cryptomus Payment Invoice
-  app.post("/api/payments/create-invoice", async (req, res) => {
-    try {
-      const paymentKey = process.env.CRYPTOMUS_PAYMENT_KEY || "";
-      const isPlaceholderCredentials = !isCryptomusGatewayActive();
+  // ---------------------------------------------------------------------------
+  // OXAPAY CRYPTO GATEWAY (API v1) — INVOICE CREATION & HMAC-SHA512 WEBHOOK
+  // ---------------------------------------------------------------------------
+  async function isOxaPayTrackIdAlreadyProcessed(
+    trackId: string,
+  ): Promise<boolean> {
+    if (!trackId) return false;
+    if (processedOxapayTrackIds.has(trackId)) return true;
 
-      if (isPlaceholderCredentials) {
-        return res.status(503).json({
-          status: "error",
-          code: "PENDIENTE_DE_REVISION",
-          error:
-            "Live Cryptomus merchant credentials (CRYPTOMUS_MERCHANT_ID / CRYPTOMUS_PAYMENT_KEY) are pending activation. Replace the placeholder values in .env once your Cryptomus merchant KYC/KYB is approved.",
-        });
+    if (adminDb && adminSdkCredentialsAvailable) {
+      try {
+        const snap = await adminDb
+          .collection("oxapay_webhooks")
+          .doc(trackId)
+          .get();
+        if (snap.exists && snap.data()?.processed === true) {
+          processedOxapayTrackIds.add(trackId);
+          return true;
+        }
+      } catch {
+        // Fallback to in-memory tracking if Firestore check fails
       }
+    }
+    return false;
+  }
 
-      const {
-        currency = "USD",
-        to_currency,
-        plan = "monthly",
-        userId,
-        email = "trader@sentinel.node",
-        returnUrl,
-      } = req.body || {};
+  async function markOxaPayTrackIdProcessed(
+    trackId: string,
+    orderId: string,
+    userId: string,
+  ): Promise<void> {
+    if (!trackId) return;
+    processedOxapayTrackIds.add(trackId);
 
-      if (isGuestOrDemoUserId(userId)) {
+    if (adminDb && adminSdkCredentialsAvailable) {
+      try {
+        await adminDb.collection("oxapay_webhooks").doc(trackId).set(
+          {
+            track_id: trackId,
+            order_id: orderId,
+            user_id: userId,
+            processed: true,
+            processed_at: Date.now(),
+          },
+          { merge: true },
+        );
+      } catch {
+        // Ignore Firestore write error once in-memory set is updated
+      }
+    }
+  }
+
+  app.post("/api/payments/oxapay/create", async (req, res) => {
+    try {
+      const authUser = await extractAuthenticatedUser(req);
+      if (
+        !authUser ||
+        !authUser.userId ||
+        isGuestOrDemoUserId(authUser.userId)
+      ) {
         return res.status(401).json({
           status: "error",
           error:
-            "Please sign in with a verified account before initiating checkout.",
+            "Please sign in with your account before starting crypto checkout.",
         });
       }
 
-      // Server-authoritative plan pricing ($29/mo, $149/6mo, $249/yr)
-      const planPrices: Record<string, string> = {
-        monthly: "29.00",
-        semiannual: "149.00",
-        annual: "249.00",
-      };
-      const normalizedPlan =
-        plan === "annual" || plan === "semiannual" ? plan : "monthly";
-      const invoiceAmount = planPrices[normalizedPlan];
-      const orderId = `sentinel_${userId}_${normalizedPlan}_${Date.now()}`;
-
-      const host = req.get("host") || "localhost:3000";
-      const protocol =
-        req.protocol === "https" || host.includes(".app") ? "https" : "http";
-      const callbackUrl = `${protocol}://${host}/api/payments/webhook`;
-      const redirectUrl =
-        returnUrl ||
-        `${protocol}://${host}/?payment_status=success&order_id=${orderId}`;
-
-      const additionalData = JSON.stringify({
-        uid: userId,
-        email,
-        plan: normalizedPlan,
-        amount: invoiceAmount,
-        created_at: new Date().toISOString(),
-      });
-
-      const cryptomusPayload: Record<string, any> = {
-        amount: invoiceAmount,
-        currency: String(currency).toUpperCase(),
-        order_id: orderId,
-        url_callback: callbackUrl,
-        url_return: redirectUrl,
-        url_success: redirectUrl,
-        is_payment_multiple: true,
-        lifetime: 7200, // 2 hours
-        additional_data: additionalData,
-      };
-
-      if (to_currency) {
-        cryptomusPayload.to_currency = String(to_currency).toUpperCase();
+      const merchantApiKey = (process.env.OXAPAY_MERCHANT_API_KEY || "").trim();
+      if (!merchantApiKey) {
+        console.error(
+          "[OxaPay Create Invoice Error] OXAPAY_MERCHANT_API_KEY is not configured.",
+        );
+        return res.status(502).json({
+          status: "error",
+          error: "Crypto payment gateway is not configured on the server.",
+        });
       }
 
-      console.log(
-        `[Cryptomus Invoice Request] Order: ${orderId} | Amount: ${invoiceAmount} ${currency} | Plan: ${normalizedPlan} | User: ${userId}`,
-      );
+      const userId = authUser.userId;
+      const email = authUser.email;
+      const amount = Number(process.env.OXAPAY_PRO_PRICE_USD || 29);
+      const sandbox = process.env.OXAPAY_SANDBOX === "true";
+      const appUrl = (
+        process.env.PUBLIC_APP_URL || "https://sentinelriskbot.com"
+      ).replace(/\/+$/, "");
+      const orderId = `sentinel_${userId}_${Date.now()}`;
 
-      const sign = createCryptomusSignature(cryptomusPayload, paymentKey);
-      const response = await fetch(`${CRYPTOMUS_API_BASE}/payment`, {
-        method: "POST",
-        headers: {
-          merchant: CRYPTOMUS_MERCHANT_ID,
-          sign: sign,
-          "Content-Type": "application/json",
+      const oxapayPayload: Record<string, any> = {
+        amount,
+        currency: "USD",
+        lifetime: 60,
+        fee_paid_by_payer: 0,
+        under_paid_coverage: 2,
+        to_currency: "USDT",
+        mixed_payment: true,
+        callback_url: `${appUrl}/api/webhooks/oxapay`,
+        return_url: `${appUrl}/dashboard?payment=success`,
+        order_id: orderId,
+        description: "Sentinel PRO - 30 Days Access",
+        thanks_message:
+          "Payment received! Your Sentinel PRO access is activating now.",
+        sandbox,
+      };
+
+      if (email) {
+        oxapayPayload.email = email;
+      }
+
+      const response = await fetch(
+        "https://api.oxapay.com/v1/payment/invoice",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            merchant_api_key: merchantApiKey,
+          },
+          body: JSON.stringify(oxapayPayload),
         },
-        body: JSON.stringify(cryptomusPayload),
-      });
-
-      const cryptomusData = await response.json();
-      console.log(
-        `[Cryptomus API Response] Status: ${response.status} | State: ${cryptomusData?.state ?? "N/A"}`,
       );
 
-      if (!response.ok || !cryptomusData?.result) {
+      const result: any = await response.json().catch(() => null);
+      if (
+        !response.ok ||
+        result?.status !== 200 ||
+        !result?.data?.payment_url
+      ) {
+        console.error("[OxaPay Create Invoice Error]", {
+          httpStatus: response.status,
+          result,
+        });
         return res.status(502).json({
           status: "error",
           error:
-            cryptomusData?.message ||
-            "Failed to generate invoice with Cryptomus gateway",
+            result?.message ||
+            "Failed to generate crypto payment invoice with OxaPay.",
         });
       }
 
-      const resData = cryptomusData.result;
+      console.log(
+        `[OxaPay Invoice Created] User: ${userId} | Order: ${orderId} | TrackId: ${result.data.track_id} | Amount: $${amount} USD`,
+      );
+
       return res.json({
-        status: "success",
-        order_id: orderId,
-        invoice_uuid: resData.uuid,
-        payment_url: resData.url,
-        amount: resData.amount,
-        currency: resData.currency,
-        payment_amount: resData.payment_amount,
-        payment_currency: resData.payer_currency || to_currency || "USDT",
-        address: resData.address || "",
-        network: resData.network || "",
-        expired_at: resData.expired_at,
-        status_payment: resData.status,
-        is_test: false,
+        paymentUrl: result.data.payment_url,
+        trackId: result.data.track_id,
+        orderId,
       });
     } catch (err: any) {
-      console.error("[Create Invoice Error]", err);
-      return res
-        .status(500)
-        .json({
-          status: "error",
-          error: err.message || "Failed to create payment invoice",
-        });
+      console.error("[OxaPay Create Exception]", err);
+      return res.status(502).json({
+        status: "error",
+        error: err?.message || "Failed to initialize OxaPay checkout",
+      });
     }
   });
 
-  // 2. Hardened Cryptomus Webhook Handler (mounted on /api/payments/webhook, /api/webhooks/cryptomus, and /api/payment/webhook)
-  const handleCryptomusWebhook = async (
-    req: express.Request,
-    res: express.Response,
-  ) => {
+  app.post("/api/webhooks/oxapay", async (req, res) => {
     try {
-      const webhookData = req.body;
-      const headerSign =
-        typeof req.headers["sign"] === "string"
-          ? req.headers["sign"]
-          : undefined;
+      const merchantApiKey = (process.env.OXAPAY_MERCHANT_API_KEY || "").trim();
+      const headerHmac =
+        typeof req.headers["hmac"] === "string"
+          ? req.headers["hmac"].trim()
+          : "";
+      const rawBody =
+        typeof (req as any).rawBody === "string" ? (req as any).rawBody : "";
 
-      // Fail closed with 401 if CRYPTOMUS_PAYMENT_KEY is missing OR signature does not match
-      const isValid = verifyCryptomusSignature(webhookData, headerSign);
-      if (!isValid) {
+      if (!merchantApiKey || !headerHmac || !rawBody) {
         console.warn(
-          "[Cryptomus Webhook] Rejected request with missing key or invalid signature.",
+          "[OxaPay Webhook] Rejected request: missing merchant key, hmac header, or rawBody.",
         );
-        return res.status(401).json({ error: "Invalid payment signature" });
+        return res.status(401).json({ error: "Invalid HMAC signature" });
       }
 
-      const { status, order_id, additional_data, uuid } = webhookData;
+      const computedHmac = crypto
+        .createHmac("sha512", merchantApiKey)
+        .update(rawBody)
+        .digest("hex")
+        .toLowerCase();
+      const incomingHmac = headerHmac.toLowerCase();
 
-      // Only activate on Cryptomus verified paid statuses: 'paid' or 'paid_over'
-      const isPaid = status === "paid" || status === "paid_over";
+      const computedBuf = Buffer.from(computedHmac, "utf8");
+      const incomingBuf = Buffer.from(incomingHmac, "utf8");
 
-      if (isPaid) {
-        let userId = "";
-        let plan = "monthly";
-
-        if (additional_data) {
-          try {
-            const parsed =
-              typeof additional_data === "string"
-                ? JSON.parse(additional_data)
-                : additional_data;
-            userId = parsed.uid || parsed.userId || "";
-            plan = parsed.plan || "monthly";
-          } catch (e) {
-            console.warn("Error parsing additional_data JSON in webhook", e);
-          }
-        }
-
-        // Fallback: extract UID from order_id pattern: sentinel_<UID>_<plan>_<timestamp>
-        if (!userId && order_id) {
-          const parts = String(order_id).split("_");
-          if (parts.length >= 2) {
-            userId = parts[1];
-          }
-        }
-
-        const days = plan === "annual" ? 365 : plan === "semiannual" ? 180 : 30;
-        console.log(
-          `[Cryptomus Payment Verified] Order: ${order_id} | UUID: ${uuid} | Status: ${status} | User: ${userId} | Plan: ${plan}`,
+      if (
+        computedBuf.length !== incomingBuf.length ||
+        !crypto.timingSafeEqual(computedBuf, incomingBuf)
+      ) {
+        console.warn(
+          "[OxaPay Webhook] Rejected request: HMAC signature mismatch.",
         );
+        return res.status(401).json({ error: "Invalid HMAC signature" });
+      }
 
-        if (isGuestOrDemoUserId(userId)) {
-          return res
-            .status(400)
-            .json({
-              error:
-                "Valid authenticated userId is required for PRO activation",
-            });
+      const payload = req.body || {};
+      const trackId = String(payload.track_id || "").trim();
+      const orderId = String(payload.order_id || "").trim();
+      const status = String(payload.status || "").trim();
+
+      console.log(
+        `[OxaPay Webhook] track_id: ${trackId || "N/A"} | order_id: ${orderId || "N/A"} | status: ${status || "N/A"}`,
+      );
+
+      if (status.toLowerCase() === "paid") {
+        // Extract userId from sentinel_<userId>_<timestamp> (preserving underscores inside userId)
+        let userId = "";
+        if (orderId.startsWith("sentinel_")) {
+          const withoutPrefix = orderId.slice("sentinel_".length);
+          const lastUnderscoreIdx = withoutPrefix.lastIndexOf("_");
+          if (lastUnderscoreIdx > 0) {
+            userId = withoutPrefix.slice(0, lastUnderscoreIdx).trim();
+          }
+        }
+
+        if (!userId || isGuestOrDemoUserId(userId)) {
+          console.warn(
+            `[OxaPay Webhook] Could not extract a valid userId from order_id: ${orderId}`,
+          );
+          return res.status(200).send("ok");
+        }
+
+        // Idempotency guard on track_id so retried webhooks never double-activate or double-extend
+        if (trackId && (await isOxaPayTrackIdAlreadyProcessed(trackId))) {
+          console.log(
+            `[OxaPay Webhook] Duplicate track_id ${trackId} ignored (already processed).`,
+          );
+          return res.status(200).send("ok");
+        }
+
+        const orderRef = trackId ? `oxapay_${trackId}` : `oxapay_${orderId}`;
+        if (processedPaymentOrders.has(`${userId}:${orderRef}`)) {
+          console.log(
+            `[OxaPay Webhook] Duplicate order reference ${orderRef} for user ${userId} ignored.`,
+          );
+          return res.status(200).send("ok");
         }
 
         const activation = await activateFirestoreProSubscription(
           userId,
-          days,
+          30,
           undefined,
-          String(order_id || uuid || ""),
+          orderRef,
         );
-        if (!activation.ok) {
-          return res.status(500).json({
-            received: true,
-            status: "error",
-            error: activation.error || "Failed to persist PRO activation",
-          });
+        if (activation.ok && trackId) {
+          await markOxaPayTrackIdProcessed(trackId, orderId, userId);
         }
-
-        return res.json({
-          received: true,
-          status: "success",
-          order_id,
-          user_upgraded: userId,
-          subscription_tier: "pro",
-          subscription_expires_at: activation.subscription_expires_at,
-          payment_status: "active",
-        });
       }
 
-      return res.json({
-        received: true,
-        status: status || "pending",
-        order_id,
-      });
+      return res.status(200).send("ok");
     } catch (err: any) {
-      console.error("[Cryptomus Webhook Exception]", err);
-      return res
-        .status(500)
-        .json({ error: err.message || "Webhook handling error" });
-    }
-  };
-
-  app.post("/api/payments/webhook", handleCryptomusWebhook);
-  app.post("/api/webhooks/cryptomus", handleCryptomusWebhook);
-  app.post("/api/payment/webhook", handleCryptomusWebhook);
-
-  // 3. POST /api/payments/verify-invoice - Strictly Verified Cryptomus Payment Check
-  app.post("/api/payments/verify-invoice", async (req, res) => {
-    try {
-      const paymentKey = process.env.CRYPTOMUS_PAYMENT_KEY;
-      const headerSign =
-        typeof req.headers["sign"] === "string"
-          ? req.headers["sign"]
-          : undefined;
-      if (!paymentKey) {
-        console.error(
-          "[Verify Invoice Security Error] CRYPTOMUS_PAYMENT_KEY is missing.",
-        );
-        return res.status(401).json({ error: "Invalid payment signature" });
-      }
-
-      if (
-        (req.body?.sign !== undefined || headerSign !== undefined) &&
-        !verifyCryptomusSignature(req.body, headerSign)
-      ) {
-        console.warn(
-          "[Verify Invoice Security Error] Rejected invalid signature on verify-invoice.",
-        );
-        return res.status(401).json({ error: "Invalid payment signature" });
-      }
-
-      if (!CRYPTOMUS_MERCHANT_ID) {
-        return res.status(500).json({
-          status: "error",
-          error:
-            "Payment gateway misconfigured: missing CRYPTOMUS_MERCHANT_ID.",
-        });
-      }
-
-      const {
-        order_id,
-        invoice_uuid,
-        userId,
-        plan = "monthly",
-      } = req.body || {};
-      const authHeader = req.headers.authorization;
-      console.log(
-        `[Verify Invoice Check] Order: ${order_id} | UUID: ${invoice_uuid} | User: ${userId}`,
-      );
-
-      if (!invoice_uuid || !order_id) {
-        return res.status(400).json({
-          status: "error",
-          error:
-            "Missing required invoice parameters (invoice_uuid, order_id).",
-        });
-      }
-
-      if (isGuestOrDemoUserId(userId)) {
-        return res.status(401).json({
-          status: "error",
-          error:
-            "Authenticated account required to verify payment and activate PRO.",
-        });
-      }
-
-      // Block Mock/Demo Invoices
-      if (String(invoice_uuid).startsWith("inv_")) {
-        return res.status(403).json({
-          status: "error",
-          payment_status: "pending",
-          error:
-            "Mock or demo invoice UUIDs cannot be verified for live account upgrades.",
-        });
-      }
-
-      const days = plan === "annual" ? 365 : plan === "semiannual" ? 180 : 30;
-      const checkPayload = { uuid: invoice_uuid, order_id };
-      const sign = createCryptomusSignature(checkPayload, paymentKey);
-
-      let checkRes: Response;
-      try {
-        checkRes = await fetch(`${CRYPTOMUS_API_BASE}/payment/info`, {
-          method: "POST",
-          headers: {
-            merchant: CRYPTOMUS_MERCHANT_ID,
-            sign,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(checkPayload),
-        });
-      } catch (apiErr: any) {
-        console.warn("[Cryptomus Verify Info Unreachable]", apiErr.message);
-        return res.status(502).json({
-          status: "error",
-          error: "Payment gateway verification unreachable",
-        });
-      }
-
-      if (!checkRes.ok) {
-        const errorText = await checkRes.text();
-        console.warn(
-          `[Cryptomus Verify Info Error ${checkRes.status}]`,
-          errorText,
-        );
-        return res.status(400).json({
-          status: "error",
-          error: "Unable to verify live payment status with Cryptomus API",
-        });
-      }
-
-      const checkData = await checkRes.json();
-      const result = checkData?.result;
-
-      if (!result) {
-        return res.status(400).json({
-          status: "error",
-          error: "Invalid response from Cryptomus API",
-        });
-      }
-
-      if (
-        result.order_id &&
-        String(result.order_id).trim() !== String(order_id).trim()
-      ) {
-        return res.status(403).json({
-          status: "error",
-          payment_status: "fraud_detected",
-          error: "Order ID mismatch detected",
-        });
-      }
-
-      if (
-        result.uuid &&
-        String(result.uuid).toLowerCase() !== String(invoice_uuid).toLowerCase()
-      ) {
-        return res.status(403).json({
-          status: "error",
-          payment_status: "fraud_detected",
-          error: "Invoice UUID mismatch detected",
-        });
-      }
-
-      const pStatus = result.status || result.payment_status;
-      const isPaid = pStatus === "paid" || pStatus === "paid_over";
-
-      if (!isPaid) {
-        return res.json({
-          status: "pending",
-          order_id,
-          invoice_uuid,
-          payment_status: pStatus || "pending",
-          subscription_tier: "free",
-        });
-      }
-
-      const activation = await activateFirestoreProSubscription(
-        userId,
-        days,
-        authHeader,
-        String(order_id),
-      );
-      if (!activation.ok) {
-        return res.status(500).json({
-          status: "error",
-          error:
-            activation.error || "Payment verified but database update failed.",
-        });
-      }
-
-      return res.json({
-        status: "success",
-        order_id,
-        invoice_uuid,
-        payment_status: "active",
-        subscription_tier: "pro",
-        subscription_expires_at: activation.subscription_expires_at,
-        expires_in_days: days,
-        verified_at: new Date().toISOString(),
-      });
-    } catch (err: any) {
-      console.error("[Verify Invoice Error]", err);
-      return res.status(500).json({
-        status: "error",
-        error: err.message || "Failed to verify invoice",
-      });
+      console.error("[OxaPay Webhook Exception]", err?.message || err);
+      return res.status(200).send("ok");
     }
   });
 

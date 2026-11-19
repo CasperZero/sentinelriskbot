@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   ShieldCheck,
   Send,
@@ -10,12 +10,12 @@ import {
   Lock,
   Mail,
   Terminal,
-  Globe
-} from 'lucide-react';
-import { useMarket } from '../context/MarketContext';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import { LegalModals, LegalDocType } from './LegalModals';
+  Globe,
+} from "lucide-react";
+import { useMarket } from "../context/MarketContext";
+import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import { LegalModals, LegalDocType } from "./LegalModals";
 
 export interface LandingPageProps {
   onNavigateToDashboard: () => void;
@@ -24,330 +24,353 @@ export interface LandingPageProps {
 
 const LANDING_COPY = {
   en: {
-    navFeatures: 'Features',
-    navEngine: 'Execution Engine',
-    navPricing: 'Pricing',
-    navLegal: 'Legal & Support',
-    navOpenTerminalAuth: 'Open Command Center',
-    navOpenTerminalGuest: 'Launch Command Center',
-    heroKicker: 'QUANTITATIVE ORDER-BOOK TELEMETRY · 24/7 TELEGRAM DISPATCH',
-    heroTitle: 'Institutional Grade Crypto Signals & Crash Protection',
+    navFeatures: "Features",
+    navEngine: "Execution Engine",
+    navPricing: "Pricing",
+    navLegal: "Legal & Support",
+    navOpenTerminalAuth: "Open Command Center",
+    navOpenTerminalGuest: "Launch Command Center",
+    heroKicker: "QUANTITATIVE ORDER-BOOK TELEMETRY · 24/7 TELEGRAM DISPATCH",
+    heroTitle: "Institutional Grade Crypto Signals & Crash Protection",
     heroHook:
-      'Real-time Binance Spot & Futures order-book telemetry scanning 24/7 so you never stare at charts all day.',
+      "Real-time Binance Spot & Futures order-book telemetry scanning 24/7 so you never stare at charts all day.",
     heroBullet1:
-      'Exact ATR Entry Zones, TP1 (+1.5R) & TP2 (+2.5R) targets, and hard-capped ≤ 4.0% Stop-Loss.',
+      "Exact ATR Entry Zones, TP1 (+1.5R) & TP2 (+2.5R) targets, and hard-capped ≤ 4.0% Stop-Loss.",
     heroBullet2:
-      'Global Flash Crash Shield that automatically locks buy signals during market dumps.',
+      "Global Flash Crash Shield that automatically locks buy signals during market dumps.",
     heroBullet3:
-      'Instant 24/7 alerts dispatched straight to your phone via Telegram.',
-    ctaLaunchFree: 'Launch Free Live Terminal',
-    ctaGetPro: 'Get Sentinel PRO - $29/mo',
-    ctaEnterPro: 'Enter PRO Command Center',
-    ctaJoinFreeTelegram: 'Join Free Telegram Alerts',
-    ctaQuickUpgradePro: 'Already convinced? Upgrade to PRO ($29/mo) →',
-    fomoBannerTitle: 'Public Free Alerts Channel (FOMO)',
+      "Instant 24/7 alerts dispatched straight to your phone via Telegram.",
+    ctaLaunchFree: "Launch Free Live Terminal",
+    ctaGetPro: "Get Sentinel PRO - $29/mo",
+    ctaEnterPro: "Enter PRO Command Center",
+    ctaJoinFreeTelegram: "Join Free Telegram Alerts",
+    ctaQuickUpgradePro: "Already convinced? Upgrade to PRO ($29/mo) →",
+    fomoBannerTitle: "Public Free Alerts Channel (FOMO)",
     fomoBannerDesc:
-      'Not PRO yet? Join our public Telegram channel (@SentinelFreeAlerts) to watch real-time signal teasers and verified TP1/TP2 wins 24/7.',
-    fomoBannerCta: 'Join Free Channel',
-    meta1: 'Instant Cryptomus Activation',
-    meta2: 'Non-Custodial (Zero Exchange Keys Required)',
-    meta3: 'Cancel Anytime',
-    previewShieldTitle: 'GLOBAL FLASH CRASH SHIELD',
-    previewLiveFeed: 'LIVE BINANCE FEED',
-    previewCrashLocked: 'Crash Shield Active — Buys Locked',
-    previewMonitored247: 'Market Conditions Monitored 24/7',
-    previewBtcRisk: 'BTC Risk',
-    previewEthRisk: 'ETH Risk',
-    previewSamplePlanLabel: 'SAMPLE TELEGRAM & TERMINAL EXECUTION PLAN',
-    previewScore: 'Score',
-    previewBuyBadge: 'BUY OPPORTUNITY',
+      "Not PRO yet? Join our public Telegram channel (@SentinelFreeAlerts) to watch real-time signal teasers and verified TP1/TP2 wins 24/7.",
+    fomoBannerCta: "Join Free Channel",
+    meta1: "Instant OxaPay & Card Activation",
+    meta2: "Non-Custodial (Zero Exchange Keys Required)",
+    meta3: "Cancel Anytime",
+    previewShieldTitle: "GLOBAL FLASH CRASH SHIELD",
+    previewLiveFeed: "LIVE BINANCE FEED",
+    previewCrashLocked: "Crash Shield Active — Buys Locked",
+    previewMonitored247: "Market Conditions Monitored 24/7",
+    previewBtcRisk: "BTC Risk",
+    previewEthRisk: "ETH Risk",
+    previewSamplePlanLabel: "SAMPLE TELEGRAM & TERMINAL EXECUTION PLAN",
+    previewScore: "Score",
+    previewBuyBadge: "BUY OPPORTUNITY",
     previewSampleDesc:
-      'Strong passive bid absorption verified near institutional L2 support floor with seller exhaustion on 15m/1h klines.',
-    previewEntryZone: 'Entry Zone',
-    previewEntryVal: 'ATR Band ±0.35x',
-    previewStopCap: 'Stop Loss Cap',
-    previewStopVal: 'Max 4.0% Risk',
-    previewTp1: 'Target 1 (TP1)',
-    previewTp1Val: '+1.5R Objective',
-    previewTp2: 'Target 2 (TP2)',
-    previewTp2Val: '+2.5R Objective',
-    previewTgHeader: '🤖 @SentinelRiskBot_bot · Just now',
-    previewTgLine1: 'SOLUSDT — TP1 HIT (+1.5R VERIFIED)',
-    previewTgLine2: 'Entry: $184.20 → Target 1: $191.50 (+3.96%) | Stop trailed to Breakeven.',
-    previewVerifiedEvery20s: 'Verified every 20s against live prices',
-    previewInspectFeed: 'Inspect Live Feed →',
-    spec1Val: '20s',
-    spec1Desc: 'Continuous Binance Spot & Futures kline + L2 depth ingestion cycle',
-    spec2Val: '≤ 4.0%',
-    spec2Desc: 'Strict algorithmic Stop-Loss risk cap enforced on every signal',
-    spec3Val: '≥ 75/100',
-    spec3Desc: 'Minimum multi-factor confluence score required to trigger an alert',
-    spec4Val: '4 Hours',
-    spec4Desc: 'Smart per-coin anti-spam cooldown window for clean mobile alerts',
-    featuresKicker: 'CORE CAPABILITIES · FIVE PRODUCTION PILLARS',
-    featuresTitle: 'Built for Disciplined Execution and Downside Capital Protection',
+      "Strong passive bid absorption verified near institutional L2 support floor with seller exhaustion on 15m/1h klines.",
+    previewEntryZone: "Entry Zone",
+    previewEntryVal: "ATR Band ±0.35x",
+    previewStopCap: "Stop Loss Cap",
+    previewStopVal: "Max 4.0% Risk",
+    previewTp1: "Target 1 (TP1)",
+    previewTp1Val: "+1.5R Objective",
+    previewTp2: "Target 2 (TP2)",
+    previewTp2Val: "+2.5R Objective",
+    previewTgHeader: "🤖 @SentinelRiskBot_bot · Just now",
+    previewTgLine1: "SOLUSDT — TP1 HIT (+1.5R VERIFIED)",
+    previewTgLine2:
+      "Entry: $184.20 → Target 1: $191.50 (+3.96%) | Stop trailed to Breakeven.",
+    previewVerifiedEvery20s: "Verified every 20s against live prices",
+    previewInspectFeed: "Inspect Live Feed →",
+    spec1Val: "20s",
+    spec1Desc:
+      "Continuous Binance Spot & Futures kline + L2 depth ingestion cycle",
+    spec2Val: "≤ 4.0%",
+    spec2Desc: "Strict algorithmic Stop-Loss risk cap enforced on every signal",
+    spec3Val: "≥ 75/100",
+    spec3Desc:
+      "Minimum multi-factor confluence score required to trigger an alert",
+    spec4Val: "4 Hours",
+    spec4Desc:
+      "Smart per-coin anti-spam cooldown window for clean mobile alerts",
+    featuresKicker: "CORE CAPABILITIES · FIVE PRODUCTION PILLARS",
+    featuresTitle:
+      "Built for Disciplined Execution and Downside Capital Protection",
     featuresSubtitle:
-      'Every component of Sentinel is engineered to eliminate emotional entries, filter out low-conviction market chop, and protect your portfolio during sudden liquidity cascades.',
+      "Every component of Sentinel is engineered to eliminate emotional entries, filter out low-conviction market chop, and protect your portfolio during sudden liquidity cascades.",
     pillars: [
       {
-        num: '01.',
-        title: '24/7 Private Telegram Alert Bot',
+        num: "01.",
+        title: "24/7 Private Telegram Alert Bot",
         description:
-          'Instant Buy, Take-Profit, and Emergency Breakdown notifications sent straight to your phone via @SentinelRiskBot_bot without needing to keep a browser tab open.',
-        highlight: 'Sub-second webhook & mobile push delivery · English & Spanish support',
-        span: 'lg:col-span-2',
+          "Instant Buy, Take-Profit, and Emergency Breakdown notifications sent straight to your phone via @SentinelRiskBot_bot without needing to keep a browser tab open.",
+        highlight:
+          "Sub-second webhook & mobile push delivery · English & Spanish support",
+        span: "lg:col-span-2",
       },
       {
-        num: '02.',
-        title: 'Institutional ATR Execution Plans',
+        num: "02.",
+        title: "Institutional ATR Execution Plans",
         description:
-          'Exact Entry Zones, TP1 (1.5R) and TP2 (2.5R) targets, and a strict Stop-Loss capped at max 4% risk on every signal.',
-        highlight: 'Hard-capped ≤ 4.0% downside protection',
-        span: 'lg:col-span-1',
+          "Exact Entry Zones, TP1 (1.5R) and TP2 (2.5R) targets, and a strict Stop-Loss capped at max 4% risk on every signal.",
+        highlight: "Hard-capped ≤ 4.0% downside protection",
+        span: "lg:col-span-1",
       },
       {
-        num: '03.',
-        title: 'Global Flash Crash Shield',
+        num: "03.",
+        title: "Global Flash Crash Shield",
         description:
-          'Real-time risk radar driven by BTC, ETH, and order-book liquidation velocity that automatically locks buy signals during market dumps to protect your capital.',
-        highlight: 'Auto-locks entries when Global Risk ≥ 80/100',
-        span: 'lg:col-span-1',
+          "Real-time risk radar driven by BTC, ETH, and order-book liquidation velocity that automatically locks buy signals during market dumps to protect your capital.",
+        highlight: "Auto-locks entries when Global Risk ≥ 80/100",
+        span: "lg:col-span-1",
       },
       {
-        num: '04.',
-        title: 'Breakdown & Evacuation Warnings',
+        num: "04.",
+        title: "Breakdown & Evacuation Warnings",
         description:
-          'Early per-coin alerts when key institutional support (1h VWAP & EMA 21) breaks with heavy taker sell volume—warning you before a deeper cascade.',
-        highlight: 'Real-time L2 support erosion & VWAP breakdown detection',
-        span: 'lg:col-span-1',
+          "Early per-coin alerts when key institutional support (1h VWAP & EMA 21) breaks with heavy taker sell volume—warning you before a deeper cascade.",
+        highlight: "Real-time L2 support erosion & VWAP breakdown detection",
+        span: "lg:col-span-1",
       },
       {
-        num: '05.',
-        title: 'Custom Spot & Futures Watchlist',
+        num: "05.",
+        title: "Custom Spot & Futures Watchlist",
         description:
-          'Track your favorite Binance Spot and USDⓈ-M Futures pairs 24/7 with automatic Spot-to-Futures fallback and smart 4-hour anti-spam cooldowns.',
-        highlight: 'Supports all major Binance Spot & Perpetual Futures pairs',
-        span: 'lg:col-span-1',
+          "Track your favorite Binance Spot and USDⓈ-M Futures pairs 24/7 with automatic Spot-to-Futures fallback and smart 4-hour anti-spam cooldowns.",
+        highlight: "Supports all major Binance Spot & Perpetual Futures pairs",
+        span: "lg:col-span-1",
       },
     ],
-    pricingKicker: 'TRANSPARENT SAAS MEMBERSHIP',
-    pricingTitle: 'One Flat Monthly Rate. Full Institutional Access.',
+    pricingKicker: "TRANSPARENT SAAS MEMBERSHIP",
+    pricingTitle: "One Flat Monthly Rate. Full Institutional Access.",
     pricingSubtitle:
-      'Instant account activation via Cryptomus. No hidden tiers, no profit-sharing fees, and no exchange API keys required.',
-    freePlanLabel: 'OBSERVER PLAN',
-    freePlanTitle: 'Sentinel Free',
-    freePlanUnit: 'USD / month',
+      "Instant account activation via OxaPay, Whop, or Mercado Pago. No hidden tiers, no profit-sharing fees, and no exchange API keys required.",
+    freePlanLabel: "OBSERVER PLAN",
+    freePlanTitle: "Sentinel Free",
+    freePlanUnit: "USD / month",
     freePlanDesc:
-      'Designed for traders who want to monitor the Global Market Risk Index and inspect recent winning signals in the web terminal.',
-    freeFeat1: 'Global Flash Crash Shield risk thermometer',
-    freeFeat2: 'Web Command Center signal preview',
-    freeFeat3: 'Recent Winning Signals verification ledger',
-    freePlanCta: 'Open Free Web Terminal',
-    proPlanLabel: 'FULL EXECUTIVE ACCESS · MOST POPULAR',
-    proPlanTitle: 'Sentinel PRO Membership',
-    proPlanUnit: ' USD / mo',
-    proPlanSub: 'Billed monthly · Instant crypto checkout',
+      "Designed for traders who want to monitor the Global Market Risk Index and inspect recent winning signals in the web terminal.",
+    freeFeat1: "Global Flash Crash Shield risk thermometer",
+    freeFeat2: "Web Command Center signal preview",
+    freeFeat3: "Recent Winning Signals verification ledger",
+    freePlanCta: "Open Free Web Terminal",
+    proPlanLabel: "FULL EXECUTIVE ACCESS · MOST POPULAR",
+    proPlanTitle: "Sentinel PRO Membership",
+    proPlanUnit: " USD / mo",
+    proPlanSub: "Billed monthly · Instant crypto checkout",
     proPlanDesc:
-      'Complete 24/7 private Telegram alert delivery, institutional ATR execution plans, custom Spot & Futures watchlist synchronization, and automated crash protection.',
+      "Complete 24/7 private Telegram alert delivery, institutional ATR execution plans, custom Spot & Futures watchlist synchronization, and automated crash protection.",
     proFeats: [
       {
-        title: '24/7 Private Telegram Alert Bot',
-        desc: 'Instant Buy, Take-Profit, and Emergency Breakdown notifications sent straight to your phone.',
+        title: "24/7 Private Telegram Alert Bot",
+        desc: "Instant Buy, Take-Profit, and Emergency Breakdown notifications sent straight to your phone.",
       },
       {
-        title: 'Institutional ATR Execution Plans',
-        desc: 'Exact Entry Zones, TP1/TP2 targets, and a strict Stop-Loss capped at max 4% risk on every signal.',
+        title: "Institutional ATR Execution Plans",
+        desc: "Exact Entry Zones, TP1/TP2 targets, and a strict Stop-Loss capped at max 4% risk on every signal.",
       },
       {
-        title: 'Global Flash Crash Shield',
-        desc: 'Real-time risk radar that automatically locks buy signals during market dumps to protect your capital.',
+        title: "Global Flash Crash Shield",
+        desc: "Real-time risk radar that automatically locks buy signals during market dumps to protect your capital.",
       },
       {
-        title: 'Breakdown & Evacuation Warnings',
-        desc: 'Early per-coin alerts when key institutional support (VWAP/EMA) breaks with heavy sell volume.',
+        title: "Breakdown & Evacuation Warnings",
+        desc: "Early per-coin alerts when key institutional support (VWAP/EMA) breaks with heavy sell volume.",
       },
       {
-        title: 'Custom Spot & Futures Watchlist',
-        desc: 'Track your favorite Binance pairs 24/7 with smart 4-hour anti-spam cooldowns.',
+        title: "Custom Spot & Futures Watchlist",
+        desc: "Track your favorite Binance pairs 24/7 with smart 4-hour anti-spam cooldowns.",
       },
     ],
-    proGatewayNote: 'Secured by Cryptomus Gateway (USDT, BTC, ETH, SOL)',
+    proGatewayNote:
+      "Secured by OxaPay, Whop & Mercado Pago (USDT, BTC, ETH, Cards)",
     footerBrandDesc:
-      'Quantitative cryptocurrency order-book risk monitoring, Flash Crash protection, and automated 24/7 Telegram execution alerts. Non-custodial analytical SaaS platform.',
-    footerSupportLabel: 'Support:',
-    footerPlatformHeader: 'Platform',
-    footerCommandCenterLink: 'Command Center (/dashboard)',
-    footerFeaturesLink: 'PRO Features',
-    footerPricingLink: 'Pricing ($29/mo)',
-    footerLegalHeader: 'Legal & Compliance',
-    footerTerms: 'Terms of Service',
-    footerPrivacy: 'Privacy Policy',
-    footerRefund: 'Refund & Cancellation Policy',
-    footerCopyright: 'Copyright © 2026 Sentinel. All rights reserved.',
-    footerCancelNote: 'Subscriptions may be canceled at any time · Support:',
+      "Quantitative cryptocurrency order-book risk monitoring, Flash Crash protection, and automated 24/7 Telegram execution alerts. Non-custodial analytical SaaS platform.",
+    footerSupportLabel: "Support:",
+    footerPlatformHeader: "Platform",
+    footerCommandCenterLink: "Command Center (/dashboard)",
+    footerFeaturesLink: "PRO Features",
+    footerPricingLink: "Pricing ($29/mo)",
+    footerLegalHeader: "Legal & Compliance",
+    footerTerms: "Terms of Service",
+    footerPrivacy: "Privacy Policy",
+    footerRefund: "Refund & Cancellation Policy",
+    footerCopyright: "Copyright © 2026 Sentinel. All rights reserved.",
+    footerCancelNote: "Subscriptions may be canceled at any time · Support:",
   },
   es: {
-    navFeatures: 'Funciones',
-    navEngine: 'Motor de Ejecución',
-    navPricing: 'Precios',
-    navLegal: 'Legal y Soporte',
-    navOpenTerminalAuth: 'Abrir Centro de Comando',
-    navOpenTerminalGuest: 'Entrar al Centro de Comando',
-    heroKicker: 'TELEMETRÍA CUANTITATIVA DEL LIBRO DE ÓRDENES · ALERTAS TELEGRAM 24/7',
-    heroTitle: 'Señales Cripto de Grado Institucional y Protección Anti-Crash',
+    navFeatures: "Funciones",
+    navEngine: "Motor de Ejecución",
+    navPricing: "Precios",
+    navLegal: "Legal y Soporte",
+    navOpenTerminalAuth: "Abrir Centro de Comando",
+    navOpenTerminalGuest: "Entrar al Centro de Comando",
+    heroKicker:
+      "TELEMETRÍA CUANTITATIVA DEL LIBRO DE ÓRDENES · ALERTAS TELEGRAM 24/7",
+    heroTitle: "Señales Cripto de Grado Institucional y Protección Anti-Crash",
     heroHook:
-      'Telemetría en vivo de Binance Spot y Futuros escaneando 24/7 para que no tengas que mirar gráficas todo el día.',
+      "Telemetría en vivo de Binance Spot y Futuros escaneando 24/7 para que no tengas que mirar gráficas todo el día.",
     heroBullet1:
-      'Zonas de entrada ATR exactas, objetivos TP1 (+1.5R) y TP2 (+2.5R), y Stop-Loss limitado al 4.0% máx.',
+      "Zonas de entrada ATR exactas, objetivos TP1 (+1.5R) y TP2 (+2.5R), y Stop-Loss limitado al 4.0% máx.",
     heroBullet2:
-      'Escudo Global Anti-Crash que bloquea compras automáticamente durante desplomes del mercado.',
+      "Escudo Global Anti-Crash que bloquea compras automáticamente durante desplomes del mercado.",
     heroBullet3:
-      'Alertas instantáneas 24/7 enviadas directo a tu celular por Telegram.',
-    ctaLaunchFree: 'Abrir Terminal en Vivo (Gratis)',
-    ctaGetPro: 'Obtener Sentinel PRO - $29/mes',
-    ctaEnterPro: 'Entrar al Centro de Comando PRO',
-    ctaJoinFreeTelegram: 'Unirse al Canal de Alertas (Gratis)',
-    ctaQuickUpgradePro: '¿Ya estás decidido? Pásate a PRO ($29/mes) →',
-    fomoBannerTitle: 'Canal Público de Alertas (FOMO)',
+      "Alertas instantáneas 24/7 enviadas directo a tu celular por Telegram.",
+    ctaLaunchFree: "Abrir Terminal en Vivo (Gratis)",
+    ctaGetPro: "Obtener Sentinel PRO - $29/mes",
+    ctaEnterPro: "Entrar al Centro de Comando PRO",
+    ctaJoinFreeTelegram: "Unirse al Canal de Alertas (Gratis)",
+    ctaQuickUpgradePro: "¿Ya estás decidido? Pásate a PRO ($29/mes) →",
+    fomoBannerTitle: "Canal Público de Alertas (FOMO)",
     fomoBannerDesc:
-      '¿Aún no eres PRO? Únete a nuestro canal público en Telegram (@SentinelFreeAlerts) para ver alertas en tiempo real y cierres ganadores TP1/TP2 verificados 24/7.',
-    fomoBannerCta: 'Unirse al Canal Gratuito',
-    meta1: 'Activación Instantánea con Cryptomus',
-    meta2: 'No Custodial (Sin Claves API de Exchanges)',
-    meta3: 'Cancela en Cualquier Momento',
-    previewShieldTitle: 'ESCUDO GLOBAL ANTI-CRASH',
-    previewLiveFeed: 'DATOS BINANCE EN VIVO',
-    previewCrashLocked: 'Escudo Anti-Crash Activo — Compras Bloqueadas',
-    previewMonitored247: 'Condiciones de Mercado Monitoreadas 24/7',
-    previewBtcRisk: 'Riesgo BTC',
-    previewEthRisk: 'Riesgo ETH',
-    previewSamplePlanLabel: 'EJEMPLO DE PLAN DE EJECUCIÓN EN TELEGRAM Y TERMINAL',
-    previewScore: 'Puntaje',
-    previewBuyBadge: 'OPORTUNIDAD DE COMPRA',
+      "¿Aún no eres PRO? Únete a nuestro canal público en Telegram (@SentinelFreeAlerts) para ver alertas en tiempo real y cierres ganadores TP1/TP2 verificados 24/7.",
+    fomoBannerCta: "Unirse al Canal Gratuito",
+    meta1: "Activación Instantánea con OxaPay y Tarjeta",
+    meta2: "No Custodial (Sin Claves API de Exchanges)",
+    meta3: "Cancela en Cualquier Momento",
+    previewShieldTitle: "ESCUDO GLOBAL ANTI-CRASH",
+    previewLiveFeed: "DATOS BINANCE EN VIVO",
+    previewCrashLocked: "Escudo Anti-Crash Activo — Compras Bloqueadas",
+    previewMonitored247: "Condiciones de Mercado Monitoreadas 24/7",
+    previewBtcRisk: "Riesgo BTC",
+    previewEthRisk: "Riesgo ETH",
+    previewSamplePlanLabel:
+      "EJEMPLO DE PLAN DE EJECUCIÓN EN TELEGRAM Y TERMINAL",
+    previewScore: "Puntaje",
+    previewBuyBadge: "OPORTUNIDAD DE COMPRA",
     previewSampleDesc:
-      'Fuerte absorción compradora verificada cerca del piso de soporte institucional L2 con agotamiento de ventas en velas de 15m y 1h.',
-    previewEntryZone: 'Zona de Entrada',
-    previewEntryVal: 'Banda ATR ±0.35x',
-    previewStopCap: 'Límite Stop Loss',
-    previewStopVal: 'Riesgo Máx. 4.0%',
-    previewTp1: 'Objetivo 1 (TP1)',
-    previewTp1Val: 'Meta +1.5R',
-    previewTp2: 'Objetivo 2 (TP2)',
-    previewTp2Val: 'Meta +2.5R',
-    previewTgHeader: '🤖 @SentinelRiskBot_bot · Ahora mismo',
-    previewTgLine1: 'SOLUSDT — TP1 ALCANZADO (+1.5R VERIFICADO)',
-    previewTgLine2: 'Entrada: $184.20 → Objetivo 1: $191.50 (+3.96%) | Stop movido a Breakeven.',
-    previewVerifiedEvery20s: 'Verificado cada 20s con precios reales del mercado',
-    previewInspectFeed: 'Ver Radar en Vivo →',
-    spec1Val: '20s',
-    spec1Desc: 'Ciclo continuo de ingesta de velas y profundidad L2 en Binance Spot y Futuros',
-    spec2Val: '≤ 4.0%',
-    spec2Desc: 'Límite estricto de riesgo máximo en Stop-Loss aplicado a cada señal',
-    spec3Val: '≥ 75/100',
-    spec3Desc: 'Puntaje mínimo de confluencia institucional requerido para disparar alertas',
-    spec4Val: '4 Horas',
-    spec4Desc: 'Enfriamiento inteligente anti-spam por moneda para alertas móviles limpias',
-    featuresKicker: 'CAPACIDADES CENTRALES · CINCO PILARES DE PRODUCCIÓN',
-    featuresTitle: 'Diseñado para una Ejecución Disciplinada y Protección de Capital',
+      "Fuerte absorción compradora verificada cerca del piso de soporte institucional L2 con agotamiento de ventas en velas de 15m y 1h.",
+    previewEntryZone: "Zona de Entrada",
+    previewEntryVal: "Banda ATR ±0.35x",
+    previewStopCap: "Límite Stop Loss",
+    previewStopVal: "Riesgo Máx. 4.0%",
+    previewTp1: "Objetivo 1 (TP1)",
+    previewTp1Val: "Meta +1.5R",
+    previewTp2: "Objetivo 2 (TP2)",
+    previewTp2Val: "Meta +2.5R",
+    previewTgHeader: "🤖 @SentinelRiskBot_bot · Ahora mismo",
+    previewTgLine1: "SOLUSDT — TP1 ALCANZADO (+1.5R VERIFICADO)",
+    previewTgLine2:
+      "Entrada: $184.20 → Objetivo 1: $191.50 (+3.96%) | Stop movido a Breakeven.",
+    previewVerifiedEvery20s:
+      "Verificado cada 20s con precios reales del mercado",
+    previewInspectFeed: "Ver Radar en Vivo →",
+    spec1Val: "20s",
+    spec1Desc:
+      "Ciclo continuo de ingesta de velas y profundidad L2 en Binance Spot y Futuros",
+    spec2Val: "≤ 4.0%",
+    spec2Desc:
+      "Límite estricto de riesgo máximo en Stop-Loss aplicado a cada señal",
+    spec3Val: "≥ 75/100",
+    spec3Desc:
+      "Puntaje mínimo de confluencia institucional requerido para disparar alertas",
+    spec4Val: "4 Horas",
+    spec4Desc:
+      "Enfriamiento inteligente anti-spam por moneda para alertas móviles limpias",
+    featuresKicker: "CAPACIDADES CENTRALES · CINCO PILARES DE PRODUCCIÓN",
+    featuresTitle:
+      "Diseñado para una Ejecución Disciplinada y Protección de Capital",
     featuresSubtitle:
-      'Cada módulo de Sentinel está diseñado para eliminar entradas emocionales, filtrar el ruido lateral del mercado y proteger tu portafolio ante caídas abruptas de liquidez.',
+      "Cada módulo de Sentinel está diseñado para eliminar entradas emocionales, filtrar el ruido lateral del mercado y proteger tu portafolio ante caídas abruptas de liquidez.",
     pillars: [
       {
-        num: '01.',
-        title: 'Bot Privado de Alertas 24/7 en Telegram',
+        num: "01.",
+        title: "Bot Privado de Alertas 24/7 en Telegram",
         description:
-          'Notificaciones instantáneas de Compra, Toma de Ganancias y Evacuación enviadas directo a tu celular mediante @SentinelRiskBot_bot sin necesidad de mantener el navegador abierto.',
-        highlight: 'Entrega móvil en menos de un segundo · Soporte en Español e Inglés',
-        span: 'lg:col-span-2',
+          "Notificaciones instantáneas de Compra, Toma de Ganancias y Evacuación enviadas directo a tu celular mediante @SentinelRiskBot_bot sin necesidad de mantener el navegador abierto.",
+        highlight:
+          "Entrega móvil en menos de un segundo · Soporte en Español e Inglés",
+        span: "lg:col-span-2",
       },
       {
-        num: '02.',
-        title: 'Planes de Ejecución Exactos (ATR)',
+        num: "02.",
+        title: "Planes de Ejecución Exactos (ATR)",
         description:
-          'Zona de Entrada exacta, Objetivos TP1 (1.5R) y TP2 (2.5R), y Stop Loss estricto limitado al 4% de riesgo máximo en cada señal.',
-        highlight: 'Protección bajista estricta ≤ 4.0% de riesgo máximo',
-        span: 'lg:col-span-1',
+          "Zona de Entrada exacta, Objetivos TP1 (1.5R) y TP2 (2.5R), y Stop Loss estricto limitado al 4% de riesgo máximo en cada señal.",
+        highlight: "Protección bajista estricta ≤ 4.0% de riesgo máximo",
+        span: "lg:col-span-1",
       },
       {
-        num: '03.',
-        title: 'Escudo Global Anti-Crash',
+        num: "03.",
+        title: "Escudo Global Anti-Crash",
         description:
-          'Radar de riesgo en tiempo real impulsado por la salud de BTC, ETH y la velocidad de liquidaciones que bloquea las compras durante desplomes para proteger tu capital.',
-        highlight: 'Bloquea compras automáticamente cuando el Riesgo Global ≥ 80/100',
-        span: 'lg:col-span-1',
+          "Radar de riesgo en tiempo real impulsado por la salud de BTC, ETH y la velocidad de liquidaciones que bloquea las compras durante desplomes para proteger tu capital.",
+        highlight:
+          "Bloquea compras automáticamente cuando el Riesgo Global ≥ 80/100",
+        span: "lg:col-span-1",
       },
       {
-        num: '04.',
-        title: 'Alertas de Ruptura y Evacuación',
+        num: "04.",
+        title: "Alertas de Ruptura y Evacuación",
         description:
-          'Avisos tempranos por moneda cuando se rompen soportes institucionales clave (VWAP 1h y EMA 21) con fuerte presión de venta.',
-        highlight: 'Detección en vivo de pérdida de soporte L2 y ruptura de VWAP',
-        span: 'lg:col-span-1',
+          "Avisos tempranos por moneda cuando se rompen soportes institucionales clave (VWAP 1h y EMA 21) con fuerte presión de venta.",
+        highlight:
+          "Detección en vivo de pérdida de soporte L2 y ruptura de VWAP",
+        span: "lg:col-span-1",
       },
       {
-        num: '05.',
-        title: 'Radar Personalizado (Spot y Futuros)',
+        num: "05.",
+        title: "Radar Personalizado (Spot y Futuros)",
         description:
-          'Monitoreo 24/7 de tus criptomonedas favoritas de Binance Spot y Futuros USDⓈ-M con soporte automático Spot-a-Futuros y filtro anti-spam de 4 horas.',
-        highlight: 'Compatible con todos los pares principales de Binance Spot y Futuros',
-        span: 'lg:col-span-1',
+          "Monitoreo 24/7 de tus criptomonedas favoritas de Binance Spot y Futuros USDⓈ-M con soporte automático Spot-a-Futuros y filtro anti-spam de 4 horas.",
+        highlight:
+          "Compatible con todos los pares principales de Binance Spot y Futuros",
+        span: "lg:col-span-1",
       },
     ],
-    pricingKicker: 'MEMBRESÍA SAAS TRANSPARENTE',
-    pricingTitle: 'Una Tarifa Mensual Fija. Acceso Institucional Completo.',
+    pricingKicker: "MEMBRESÍA SAAS TRANSPARENTE",
+    pricingTitle: "Una Tarifa Mensual Fija. Acceso Institucional Completo.",
     pricingSubtitle:
-      'Activación instantánea mediante Cryptomus. Sin niveles ocultos, sin comisiones sobre ganancias y sin pedir claves API de tus exchanges.',
-    freePlanLabel: 'PLAN OBSERVADOR',
-    freePlanTitle: 'Sentinel Gratis',
-    freePlanUnit: 'USD / mes',
+      "Activación instantánea mediante OxaPay, Whop o Mercado Pago. Sin niveles ocultos, sin comisiones sobre ganancias y sin pedir claves API de tus exchanges.",
+    freePlanLabel: "PLAN OBSERVADOR",
+    freePlanTitle: "Sentinel Gratis",
+    freePlanUnit: "USD / mes",
     freePlanDesc:
-      'Diseñado para operadores que desean monitorear el Índice de Riesgo Global e inspeccionar el historial de señales ganadoras en la terminal web.',
-    freeFeat1: 'Termómetro en vivo del Escudo Global Anti-Crash',
-    freeFeat2: 'Vista previa de señales en el Centro de Comando web',
-    freeFeat3: 'Historial verificado de Señales Ganadoras (TP1/TP2)',
-    freePlanCta: 'Abrir Terminal Web Gratis',
-    proPlanLabel: 'ACCESO EJECUTIVO COMPLETO · MÁS POPULAR',
-    proPlanTitle: 'Membresía Sentinel PRO',
-    proPlanUnit: ' USD / mes',
-    proPlanSub: 'Facturación mensual · Pago cripto instantáneo',
+      "Diseñado para operadores que desean monitorear el Índice de Riesgo Global e inspeccionar el historial de señales ganadoras en la terminal web.",
+    freeFeat1: "Termómetro en vivo del Escudo Global Anti-Crash",
+    freeFeat2: "Vista previa de señales en el Centro de Comando web",
+    freeFeat3: "Historial verificado de Señales Ganadoras (TP1/TP2)",
+    freePlanCta: "Abrir Terminal Web Gratis",
+    proPlanLabel: "ACCESO EJECUTIVO COMPLETO · MÁS POPULAR",
+    proPlanTitle: "Membresía Sentinel PRO",
+    proPlanUnit: " USD / mes",
+    proPlanSub: "Facturación mensual · Pago cripto instantáneo",
     proPlanDesc:
-      'Alertas privadas 24/7 en Telegram, planes de ejecución ATR exactos, sincronización personalizada de Watchlist Spot y Futuros, y protección automática Anti-Crash.',
+      "Alertas privadas 24/7 en Telegram, planes de ejecución ATR exactos, sincronización personalizada de Watchlist Spot y Futuros, y protección automática Anti-Crash.",
     proFeats: [
       {
-        title: 'Bot Privado de Alertas 24/7 en Telegram',
-        desc: 'Notificaciones instantáneas de Compra, Toma de Ganancias y Evacuación directo a tu celular.',
+        title: "Bot Privado de Alertas 24/7 en Telegram",
+        desc: "Notificaciones instantáneas de Compra, Toma de Ganancias y Evacuación directo a tu celular.",
       },
       {
-        title: 'Planes de Ejecución Exactos (ATR)',
-        desc: 'Zona de Entrada, Objetivos TP1/TP2 y Stop Loss estricto limitado al 4% de riesgo máximo en cada señal.',
+        title: "Planes de Ejecución Exactos (ATR)",
+        desc: "Zona de Entrada, Objetivos TP1/TP2 y Stop Loss estricto limitado al 4% de riesgo máximo en cada señal.",
       },
       {
-        title: 'Escudo Global Anti-Crash',
-        desc: 'Radar de riesgo en tiempo real que bloquea las compras durante desplomes para proteger tu capital.',
+        title: "Escudo Global Anti-Crash",
+        desc: "Radar de riesgo en tiempo real que bloquea las compras durante desplomes para proteger tu capital.",
       },
       {
-        title: 'Alertas de Ruptura y Evacuación',
-        desc: 'Avisos inmediatos por moneda cuando se rompen soportes institucionales (VWAP/EMA) con fuerte presión de venta.',
+        title: "Alertas de Ruptura y Evacuación",
+        desc: "Avisos inmediatos por moneda cuando se rompen soportes institucionales (VWAP/EMA) con fuerte presión de venta.",
       },
       {
-        title: 'Radar Personalizado (Spot y Futuros)',
-        desc: 'Monitoreo 24/7 de tus criptomonedas favoritas de Binance con filtro inteligente anti-spam.',
+        title: "Radar Personalizado (Spot y Futuros)",
+        desc: "Monitoreo 24/7 de tus criptomonedas favoritas de Binance con filtro inteligente anti-spam.",
       },
     ],
-    proGatewayNote: 'Pago seguro vía Cryptomus Gateway (USDT, BTC, ETH, SOL)',
+    proGatewayNote:
+      "Pago seguro vía OxaPay, Whop y Mercado Pago (USDT, BTC, ETH, Tarjetas)",
     footerBrandDesc:
-      'Monitoreo cuantitativo de riesgo en libros de órdenes cripto, protección Anti-Crash y alertas automatizadas de ejecución 24/7 en Telegram. Plataforma SaaS analítica no custodial.',
-    footerSupportLabel: 'Soporte:',
-    footerPlatformHeader: 'Plataforma',
-    footerCommandCenterLink: 'Centro de Comando (/dashboard)',
-    footerFeaturesLink: 'Beneficios PRO',
-    footerPricingLink: 'Precios ($29/mes)',
-    footerLegalHeader: 'Legal y Cumplimiento',
-    footerTerms: 'Términos de Servicio',
-    footerPrivacy: 'Política de Privacidad',
-    footerRefund: 'Política de Reembolsos y Cancelación',
-    footerCopyright: 'Copyright © 2026 Sentinel. Todos los derechos reservados.',
-    footerCancelNote: 'Las suscripciones pueden cancelarse en cualquier momento · Soporte:',
+      "Monitoreo cuantitativo de riesgo en libros de órdenes cripto, protección Anti-Crash y alertas automatizadas de ejecución 24/7 en Telegram. Plataforma SaaS analítica no custodial.",
+    footerSupportLabel: "Soporte:",
+    footerPlatformHeader: "Plataforma",
+    footerCommandCenterLink: "Centro de Comando (/dashboard)",
+    footerFeaturesLink: "Beneficios PRO",
+    footerPricingLink: "Precios ($29/mes)",
+    footerLegalHeader: "Legal y Cumplimiento",
+    footerTerms: "Términos de Servicio",
+    footerPrivacy: "Política de Privacidad",
+    footerRefund: "Política de Reembolsos y Cancelación",
+    footerCopyright:
+      "Copyright © 2026 Sentinel. Todos los derechos reservados.",
+    footerCancelNote:
+      "Las suscripciones pueden cancelarse en cualquier momento · Soporte:",
   },
 };
 
@@ -355,21 +378,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onNavigateToDashboard,
   onGetProClick,
 }) => {
-  const { globalRiskIndex, btcRiskIndex, ethRiskIndex, isCrashWarningActive } = useMarket();
+  const { globalRiskIndex, btcRiskIndex, ethRiskIndex, isCrashWarningActive } =
+    useMarket();
   const { user, isPremium, updateLanguagePreference } = useAuth();
   const { language, setLanguage } = useLanguage();
   const [activeLegalDoc, setActiveLegalDoc] = useState<LegalDocType>(null);
 
-  const isEs = language === 'es';
+  const isEs = language === "es";
   const copy = isEs ? LANDING_COPY.es : LANDING_COPY.en;
 
-  const handleSelectLanguage = (nextLang: 'en' | 'es') => {
+  const handleSelectLanguage = (nextLang: "en" | "es") => {
     if (nextLang === language) return;
     setLanguage(nextLang);
     updateLanguagePreference(nextLang).catch(() => {});
   };
 
-  const effectiveGlobalRisk = globalRiskIndex > 0 ? Math.round(globalRiskIndex) : 22;
+  const effectiveGlobalRisk =
+    globalRiskIndex > 0 ? Math.round(globalRiskIndex) : 22;
   const effectiveBtcRisk = btcRiskIndex > 0 ? Math.round(btcRiskIndex) : 19;
   const effectiveEthRisk = ethRiskIndex > 0 ? Math.round(ethRiskIndex) : 24;
 
@@ -393,7 +418,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             href="/"
             onClick={(e) => {
               e.preventDefault();
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+              window.scrollTo({ top: 0, behavior: "smooth" });
             }}
             className="text-lg font-extrabold tracking-tight text-[#EAECEF] whitespace-nowrap shrink-0"
           >
@@ -438,22 +463,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <Globe className="w-3.5 h-3.5 text-[#848E9C] ml-2 mr-1 hidden sm:inline" />
               <button
                 type="button"
-                onClick={() => handleSelectLanguage('en')}
+                onClick={() => handleSelectLanguage("en")}
                 className={`px-2.5 py-1 rounded-md font-bold transition-colors whitespace-nowrap ${
-                  language === 'en'
-                    ? 'bg-[#F0B90B] text-slate-950'
-                    : 'text-[#848E9C] hover:text-[#EAECEF]'
+                  language === "en"
+                    ? "bg-[#F0B90B] text-slate-950"
+                    : "text-[#848E9C] hover:text-[#EAECEF]"
                 }`}
               >
                 EN
               </button>
               <button
                 type="button"
-                onClick={() => handleSelectLanguage('es')}
+                onClick={() => handleSelectLanguage("es")}
                 className={`px-2.5 py-1 rounded-md font-bold transition-colors whitespace-nowrap ${
-                  language === 'es'
-                    ? 'bg-[#F0B90B] text-slate-950'
-                    : 'text-[#848E9C] hover:text-[#EAECEF]'
+                  language === "es"
+                    ? "bg-[#F0B90B] text-slate-950"
+                    : "text-[#848E9C] hover:text-[#EAECEF]"
                 }`}
               >
                 ES
@@ -487,8 +512,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <h1
                   className="font-extrabold text-[#EAECEF] tracking-tight leading-[1.12] max-w-2xl"
                   style={{
-                    fontSize: 'clamp(2.25rem, 4vw, 3.75rem)',
-                    textWrap: 'balance',
+                    fontSize: "clamp(2.25rem, 4vw, 3.75rem)",
+                    textWrap: "balance",
                   }}
                 >
                   {copy.heroTitle}
@@ -583,7 +608,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                             : copy.previewMonitored247}
                         </div>
                         <div className="text-xs text-[#848E9C] mt-0.5 font-mono tabular-nums">
-                          {copy.previewBtcRisk}: {effectiveBtcRisk}/100 · {copy.previewEthRisk}: {effectiveEthRisk}/100
+                          {copy.previewBtcRisk}: {effectiveBtcRisk}/100 ·{" "}
+                          {copy.previewEthRisk}: {effectiveEthRisk}/100
                         </div>
                       </div>
                       <div className="text-right font-mono tabular-nums">
@@ -597,7 +623,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     <div className="h-2 w-full rounded-sm bg-[#121418] overflow-hidden">
                       <div
                         className="h-full bg-[#0ECB81] transition-all duration-300"
-                        style={{ width: `${Math.min(100, Math.max(8, effectiveGlobalRisk))}%` }}
+                        style={{
+                          width: `${Math.min(100, Math.max(8, effectiveGlobalRisk))}%`,
+                        }}
                       />
                     </div>
                   </div>
@@ -624,20 +652,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                     <div className="grid grid-cols-2 gap-3 bg-[#121418] border border-[#2B2F36] rounded-xl p-3.5 font-mono text-xs tabular-nums">
                       <div>
-                        <div className="text-[10px] text-[#848E9C] uppercase">{copy.previewEntryZone}</div>
-                        <div className="font-bold text-[#EAECEF] mt-0.5">{copy.previewEntryVal}</div>
+                        <div className="text-[10px] text-[#848E9C] uppercase">
+                          {copy.previewEntryZone}
+                        </div>
+                        <div className="font-bold text-[#EAECEF] mt-0.5">
+                          {copy.previewEntryVal}
+                        </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-[#848E9C] uppercase">{copy.previewStopCap}</div>
-                        <div className="font-bold text-[#F6465D] mt-0.5">{copy.previewStopVal}</div>
+                        <div className="text-[10px] text-[#848E9C] uppercase">
+                          {copy.previewStopCap}
+                        </div>
+                        <div className="font-bold text-[#F6465D] mt-0.5">
+                          {copy.previewStopVal}
+                        </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-[#848E9C] uppercase">{copy.previewTp1}</div>
-                        <div className="font-bold text-[#0ECB81] mt-0.5">{copy.previewTp1Val}</div>
+                        <div className="text-[10px] text-[#848E9C] uppercase">
+                          {copy.previewTp1}
+                        </div>
+                        <div className="font-bold text-[#0ECB81] mt-0.5">
+                          {copy.previewTp1Val}
+                        </div>
                       </div>
                       <div>
-                        <div className="text-[10px] text-[#848E9C] uppercase">{copy.previewTp2}</div>
-                        <div className="font-bold text-[#0ECB81] mt-0.5">{copy.previewTp2Val}</div>
+                        <div className="text-[10px] text-[#848E9C] uppercase">
+                          {copy.previewTp2}
+                        </div>
+                        <div className="font-bold text-[#0ECB81] mt-0.5">
+                          {copy.previewTp2Val}
+                        </div>
                       </div>
                     </div>
 
@@ -739,7 +783,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* =================================================================== */}
         {/* FEATURES BENTO GRID: THE 5 CORE PRO PILLARS                         */}
         {/* =================================================================== */}
-        <section id="features" className="py-16 sm:py-24 border-b border-[#2B2F36]">
+        <section
+          id="features"
+          className="py-16 sm:py-24 border-b border-[#2B2F36]"
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
             <div className="max-w-2xl space-y-3">
               <div className="text-xs font-mono text-[#F0B90B] tracking-wide">
@@ -747,7 +794,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <h2
                 className="text-2xl sm:text-3xl font-bold text-[#EAECEF] tracking-tight"
-                style={{ textWrap: 'balance' }}
+                style={{ textWrap: "balance" }}
               >
                 {copy.featuresTitle}
               </h2>
@@ -793,7 +840,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* =================================================================== */}
         {/* PRICING SECTION ($29 USD / MONTH)                                   */}
         {/* =================================================================== */}
-        <section id="pricing" className="py-16 sm:py-24 border-b border-[#2B2F36]">
+        <section
+          id="pricing"
+          className="py-16 sm:py-24 border-b border-[#2B2F36]"
+        >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
             <div className="max-w-2xl mx-auto text-center space-y-3">
               <div className="text-xs font-mono text-[#F0B90B] tracking-wide">
@@ -801,7 +851,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <h2
                 className="text-2xl sm:text-3xl font-bold text-[#EAECEF] tracking-tight"
-                style={{ textWrap: 'balance' }}
+                style={{ textWrap: "balance" }}
               >
                 {copy.pricingTitle}
               </h2>
@@ -815,11 +865,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="lg:col-span-5 bg-[#121418] border border-[#2B2F36] rounded-2xl p-6 sm:p-8 flex flex-col justify-between gap-6">
                 <div className="space-y-5">
                   <div>
-                    <div className="text-xs font-mono text-[#848E9C]">{copy.freePlanLabel}</div>
-                    <h3 className="text-xl font-bold text-[#EAECEF] mt-1">{copy.freePlanTitle}</h3>
+                    <div className="text-xs font-mono text-[#848E9C]">
+                      {copy.freePlanLabel}
+                    </div>
+                    <h3 className="text-xl font-bold text-[#EAECEF] mt-1">
+                      {copy.freePlanTitle}
+                    </h3>
                     <div className="mt-4 flex items-baseline gap-1 font-mono tabular-nums">
-                      <span className="text-3xl font-extrabold text-[#EAECEF]">$0</span>
-                      <span className="text-xs text-[#848E9C]">{copy.freePlanUnit}</span>
+                      <span className="text-3xl font-extrabold text-[#EAECEF]">
+                        $0
+                      </span>
+                      <span className="text-xs text-[#848E9C]">
+                        {copy.freePlanUnit}
+                      </span>
                     </div>
                   </div>
 
@@ -868,7 +926,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     <div className="text-left sm:text-right font-mono tabular-nums">
                       <div className="text-3xl sm:text-4xl font-extrabold text-[#F0B90B]">
                         $29
-                        <span className="text-sm font-normal text-[#848E9C]">{copy.proPlanUnit}</span>
+                        <span className="text-sm font-normal text-[#848E9C]">
+                          {copy.proPlanUnit}
+                        </span>
                       </div>
                       <div className="text-[11px] text-[#848E9C]">
                         {copy.proPlanSub}
@@ -887,7 +947,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                           <Check className="w-4 h-4 text-[#0ECB81] shrink-0 mt-0.5" />
                           <div>
                             <span className="font-semibold">{feat.title}</span>
-                            <span className="text-[#848E9C]"> — {feat.desc}</span>
+                            <span className="text-[#848E9C]">
+                              {" "}
+                              — {feat.desc}
+                            </span>
                           </div>
                         </li>
                       ))}
@@ -912,7 +975,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </span>
                     <button
                       type="button"
-                      onClick={() => setActiveLegalDoc('refund')}
+                      onClick={() => setActiveLegalDoc("refund")}
                       className="text-[#848E9C] hover:text-[#EAECEF] underline"
                     >
                       {copy.footerRefund}
@@ -926,7 +989,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </main>
 
       {/* ===================================================================== */}
-      {/* COMPLIANCE FOOTER (CRITICAL FOR CRYPTOMUS KYC/KYB APPROVAL)           */}
+      {/* COMPLIANCE FOOTER                                                     */}
       {/* ===================================================================== */}
       <footer
         id="compliance-footer"
@@ -970,12 +1033,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </button>
                 </li>
                 <li>
-                  <a href="#features" className="hover:text-[#EAECEF] transition-colors">
+                  <a
+                    href="#features"
+                    className="hover:text-[#EAECEF] transition-colors"
+                  >
                     {copy.footerFeaturesLink}
                   </a>
                 </li>
                 <li>
-                  <a href="#pricing" className="hover:text-[#EAECEF] transition-colors">
+                  <a
+                    href="#pricing"
+                    className="hover:text-[#EAECEF] transition-colors"
+                  >
                     {copy.footerPricingLink}
                   </a>
                 </li>
@@ -991,7 +1060,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveLegalDoc('terms')}
+                    onClick={() => setActiveLegalDoc("terms")}
                     className="hover:text-[#EAECEF] underline underline-offset-4 transition-colors text-left"
                   >
                     {copy.footerTerms}
@@ -1000,7 +1069,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveLegalDoc('privacy')}
+                    onClick={() => setActiveLegalDoc("privacy")}
                     className="hover:text-[#EAECEF] underline underline-offset-4 transition-colors text-left"
                   >
                     {copy.footerPrivacy}
@@ -1009,7 +1078,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <li>
                   <button
                     type="button"
-                    onClick={() => setActiveLegalDoc('refund')}
+                    onClick={() => setActiveLegalDoc("refund")}
                     className="hover:text-[#EAECEF] underline underline-offset-4 transition-colors text-left"
                   >
                     {copy.footerRefund}
@@ -1022,8 +1091,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="pt-6 border-t border-[#2B2F36] flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[11px] text-[#848E9C]">
             <div>{copy.footerCopyright}</div>
             <div>
-              {copy.footerCancelNote}{' '}
-              <a href="mailto:support@sentinelriskbot.com" className="text-[#EAECEF] hover:underline">
+              {copy.footerCancelNote}{" "}
+              <a
+                href="mailto:support@sentinelriskbot.com"
+                className="text-[#EAECEF] hover:underline"
+              >
                 support@sentinelriskbot.com
               </a>
             </div>

@@ -188,48 +188,38 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setError(null);
 
     try {
-      const planInfo = planDetails[selectedPlan];
-      const targetCrypto = selectedCrypto.startsWith("USDT")
-        ? "USDT"
-        : selectedCrypto;
       const idToken = await user.getIdToken().catch(() => null);
+      if (!idToken) {
+        throw new Error(
+          isEs
+            ? "Su sesión expiró. Por favor inicie sesión nuevamente."
+            : "Your session expired. Please sign in again.",
+        );
+      }
 
-      const res = await fetch("/api/payments/create-invoice", {
+      const res = await fetch("/api/payments/oxapay/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({
-          amount: planInfo.amountNum,
-          currency: "USD",
-          to_currency: targetCrypto,
-          plan: selectedPlan,
-          userId: user.uid,
-          email: user.email || userProfile?.email || "trader@sentinel.node",
-          returnUrl: window.location.href,
-        }),
+        body: JSON.stringify({}),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (data?.code === "PENDIENTE_DE_REVISION" || res.status === 503) {
-        setError(
-          isEs
-            ? "Próximamente: La pasarela cripto Cryptomus se encuentra en revisión final. Por favor utilice Tarjeta / Apple Pay (Whop) o Mercado Pago desde el panel PRO."
-            : "Coming Soon: The Cryptomus crypto gateway is undergoing final activation. Please use Card / Apple Pay (Whop) or Mercado Pago from the PRO modal.",
+      if (!res.ok || !data.paymentUrl) {
+        throw new Error(
+          data.error ||
+            (isEs
+              ? "No se pudo generar la factura de pago en OxaPay."
+              : "Failed to create OxaPay payment invoice."),
         );
-        return;
       }
 
-      if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to create Cryptomus invoice");
-      }
-
-      setInvoice(data);
-      setTimeLeft(7200);
+      window.location.href = data.paymentUrl;
     } catch (err: any) {
-      console.error("[Checkout Error]", err);
+      console.error("[OxaPay Checkout Error]", err);
       setError(
         err.message ||
           (isEs
@@ -246,64 +236,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       navigator.clipboard.writeText(text);
       setCopiedField(field);
       setTimeout(() => setCopiedField(null), 2000);
-    }
-  };
-
-  const handleVerifyPayment = async () => {
-    if (!invoice || !user?.uid) return;
-    setVerifying(true);
-    setError(null);
-
-    try {
-      const idToken = await user.getIdToken().catch(() => null);
-      const res = await fetch("/api/payments/verify-invoice", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
-        },
-        body: JSON.stringify({
-          order_id: invoice.order_id,
-          invoice_uuid: invoice.invoice_uuid,
-          userId: user.uid,
-          plan: selectedPlan,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(
-          data.error ||
-            (isEs
-              ? "No se pudo verificar el pago con la pasarela."
-              : "Unable to verify payment with gateway."),
-        );
-        return;
-      }
-
-      if (
-        data.status === "success" &&
-        (data.subscription_tier === "pro" || data.payment_status === "active")
-      ) {
-        // Server verified payment and updated Firestore directly; AuthContext onSnapshot syncs automatically
-        setPaymentSuccess(true);
-      } else {
-        setError(
-          isEs
-            ? "El pago aún está en proceso en la blockchain. Por favor confirme su transferencia."
-            : "Payment is still confirming on-chain. Please verify transaction.",
-        );
-      }
-    } catch (err: any) {
-      console.warn("Verify payment error:", err);
-      setError(
-        isEs
-          ? "Error de conexión al verificar el pago. Intente de nuevo."
-          : "Connection error verifying payment. Please try again.",
-      );
-    } finally {
-      setVerifying(false);
     }
   };
 
@@ -326,8 +258,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-[#EAECEF] uppercase tracking-wide">
                   {isEs
-                    ? "Pasarela de Pago Cripto Cryptomus"
-                    : "Cryptomus Crypto Payment Gateway"}
+                    ? "Pasarela de Pago Cripto OxaPay"
+                    : "OxaPay Crypto Payment Gateway"}
                 </h3>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/40">
                   OFFICIAL QUANT GATE
@@ -461,8 +393,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <div className="space-y-3">
                 <label className="text-xs font-bold text-[#848E9C] uppercase tracking-wider block">
                   {isEs
-                    ? "2. Seleccione Criptomoneda de Pago (Cryptomus)"
-                    : "2. Select Payment Cryptocurrency (Cryptomus)"}
+                    ? "2. Seleccione Criptomoneda de Pago (OxaPay)"
+                    : "2. Select Payment Cryptocurrency (OxaPay)"}
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                   {CRYPTO_CURRENCIES.map((crypto) => {
@@ -506,8 +438,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <ShieldCheck className="w-5 h-5 text-emerald-400 flex-shrink-0" />
                 <span>
                   {isEs
-                    ? "Procesado de forma segura por Cryptomus Payment Gateway. Activación inmediata sin custodia de llaves privadas."
-                    : "Securely processed by Cryptomus. Automatic on-chain callback triggers instant membership upgrade."}
+                    ? "Procesado de forma segura por OxaPay Payment Gateway. Activación inmediata sin custodia de llaves privadas."
+                    : "Securely processed by OxaPay. Automatic on-chain callback triggers instant membership upgrade."}
                 </span>
               </div>
 
@@ -530,8 +462,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     <span>
                       {isEs
-                        ? "GENERANDO FACTURA CRYPTOMUS..."
-                        : "GENERATING CRYPTOMUS INVOICE..."}
+                        ? "GENERANDO FACTURA OXAPAY..."
+                        : "GENERATING OXAPAY INVOICE..."}
                     </span>
                   </>
                 ) : (
@@ -548,7 +480,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </button>
             </div>
           ) : (
-            /* STEP 2: INVOICE DETAILS & CRYPTOMUS PAYMENT SCREEN */
+            /* STEP 2: INVOICE DETAILS & OXAPAY PAYMENT SCREEN */
             <div className="space-y-5">
               {/* Top Banner with Expiry & Status */}
               <div className="p-4 bg-[#181A20] rounded-xl border border-[#F0B90B]/30 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -581,7 +513,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               </div>
 
-              {/* Direct Cryptomus Hosted Link Button */}
+              {/* Direct OxaPay Hosted Link Button */}
               {invoice.payment_url && (
                 <a
                   href={invoice.payment_url}
@@ -591,8 +523,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 >
                   <span>
                     {isEs
-                      ? "ABRIR PASARELA CRYPTOMUS OFICIAL"
-                      : "OPEN OFFICIAL CRYPTOMUS CHECKOUT"}
+                      ? "ABRIR PASARELA OXAPAY OFICIAL"
+                      : "OPEN OFFICIAL OXAPAY CHECKOUT"}
                   </span>
                   <ExternalLink className="w-4 h-4" />
                 </a>
@@ -691,33 +623,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   className="py-3 px-4 rounded-xl border border-[#2B2F36] hover:bg-[#181A20] text-xs font-bold text-[#848E9C] hover:text-[#EAECEF] transition"
                 >
                   {isEs ? "Cambiar Plan o Moneda" : "Change Plan / Currency"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleVerifyPayment}
-                  disabled={verifying}
-                  className="flex-1 py-3.5 bg-emerald-500 hover:bg-emerald-400 active:opacity-90 disabled:opacity-50 text-slate-950 font-extrabold text-xs uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
-                >
-                  {verifying ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>
-                        {isEs
-                          ? "VERIFICANDO EN BLOCKCHAIN..."
-                          : "CHECKING ON-CHAIN STATUS..."}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>
-                        {isEs
-                          ? "YA HE PAGADO (CONFIRMAR ACTIVACIÓN)"
-                          : "I HAVE PAID (VERIFY & ACTIVATE)"}
-                      </span>
-                    </>
-                  )}
                 </button>
               </div>
             </div>
