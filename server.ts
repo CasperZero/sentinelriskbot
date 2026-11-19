@@ -13,6 +13,7 @@ import {
   getFirestore as getAdminFirestore,
   type Firestore as AdminFirestore,
 } from "firebase-admin/firestore";
+import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -2737,6 +2738,7 @@ async function startServer() {
           const userRef = adminDb.collection("users").doc(userId);
           await userRef.set(
             {
+              isPremium: true,
               subscription_tier: "pro",
               subscription_expires_at: expiresAtMs,
               payment_status: "active",
@@ -2759,7 +2761,7 @@ async function startServer() {
 
       let data: any = null;
       if (!updatedViaAdmin) {
-        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/users/${encodeURIComponent(userId)}?updateMask.fieldPaths=subscription_tier&updateMask.fieldPaths=subscription_expires_at&updateMask.fieldPaths=payment_status&key=${FIREBASE_API_KEY}`;
+        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/users/${encodeURIComponent(userId)}?updateMask.fieldPaths=isPremium&updateMask.fieldPaths=subscription_tier&updateMask.fieldPaths=subscription_expires_at&updateMask.fieldPaths=payment_status&key=${FIREBASE_API_KEY}`;
 
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -2775,6 +2777,7 @@ async function startServer() {
 
         const body = {
           fields: {
+            isPremium: { booleanValue: true },
             subscription_tier: { stringValue: "pro" },
             subscription_expires_at: { integerValue: String(expiresAtMs) },
             payment_status: { stringValue: "active" },
@@ -2836,8 +2839,8 @@ async function startServer() {
           const expDateStr = new Date(expiresAtMs).toISOString().split("T")[0];
           const welcomeMsg =
             langPref === "en"
-              ? `🚀 *SENTINEL PRO ACTIVATED!*\n━━━━━━━━━━━━━━━━━━━━\n✅ Your crypto payment has been verified and your *Sentinel PRO* membership is now *ACTIVE*.\n\n🛡️ *Unlocked 24/7 Capabilities:*\n• Private 24/7 Buy, Take-Profit & Evacuation Alerts\n• Institutional ATR Execution Plans (Entry, TP1/TP2, Max 4% SL)\n• Global Flash Crash Shield & Breakdown Warnings\n• Custom Spot & Futures Watchlist Filtering\n\n📅 *Active Until:* \`${expDateStr}\`\n\n🌐 Terminal Web: [sentinelriskbot.com](https://www.sentinelriskbot.com)\n🤖 Sentinel 24/7 Bot: [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`
-              : `🚀 *¡BIENVENIDO A SENTINEL PRO!*\n━━━━━━━━━━━━━━━━━━━━\n✅ Tu pago en cripto ha sido verificado y tu membresía *Sentinel PRO* ya está *ACTIVA*.\n\n🛡️ *Beneficios Desbloqueados 24/7:*\n• Bot Privado de Alertas 24/7 (Compra, Take-Profit y Evacuación)\n• Planes Institucionales ATR (Entrada, TP1/TP2 y Stop Loss máx 4%)\n• Escudo Global Anti-Crash y Alertas de Ruptura Bajista\n• Lista Personalizada Spot & Futuros con Filtro Anti-Spam\n\n📅 *Activo Hasta:* \`${expDateStr}\`\n\n🌐 Terminal Web: [sentinelriskbot.com](https://www.sentinelriskbot.com)\n🤖 Sentinel 24/7 Bot: [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
+              ? `🚀 *SENTINEL PRO ACTIVATED!*\n━━━━━━━━━━━━━━━━━━━━\n✅ Your payment has been verified and your *Sentinel PRO* membership is now *ACTIVE*.\n\n🛡️ *Unlocked 24/7 Capabilities:*\n• Private 24/7 Buy, Take-Profit & Evacuation Alerts\n• Institutional ATR Execution Plans (Entry, TP1/TP2, Max 4% SL)\n• Global Flash Crash Shield & Breakdown Warnings\n• Custom Spot & Futures Watchlist Filtering\n\n📅 *Active Until:* \`${expDateStr}\`\n\n🌐 Terminal Web: [sentinelriskbot.com](https://www.sentinelriskbot.com)\n🤖 Sentinel 24/7 Bot: [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`
+              : `🚀 *¡BIENVENIDO A SENTINEL PRO!*\n━━━━━━━━━━━━━━━━━━━━\n✅ Tu pago ha sido verificado y tu membresía *Sentinel PRO* ya está *ACTIVA*.\n\n🛡️ *Beneficios Desbloqueados 24/7:*\n• Bot Privado de Alertas 24/7 (Compra, Take-Profit y Evacuación)\n• Planes Institucionales ATR (Entrada, TP1/TP2 y Stop Loss máx 4%)\n• Escudo Global Anti-Crash y Alertas de Ruptura Bajista\n• Lista Personalizada Spot & Futuros con Filtro Anti-Spam\n\n📅 *Activo Hasta:* \`${expDateStr}\`\n\n🌐 Terminal Web: [sentinelriskbot.com](https://www.sentinelriskbot.com)\n🤖 Sentinel 24/7 Bot: [@SentinelRiskBot_bot](https://t.me/SentinelRiskBot_bot)`;
 
           await sendTelegramMessage(chatId, welcomeMsg);
           console.log(
@@ -2853,21 +2856,368 @@ async function startServer() {
     }
   }
 
+  // Helper: Resolve Firebase userId by email for Whop webhook fallback when metadata.uid is absent
+  async function resolveUserIdByEmail(
+    rawEmail?: string,
+  ): Promise<string | null> {
+    const cleanEmail = String(rawEmail || "")
+      .trim()
+      .toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes("@")) return null;
+
+    if (adminAppInstance && adminSdkCredentialsAvailable) {
+      try {
+        const authUser =
+          await getAdminAuth(adminAppInstance).getUserByEmail(cleanEmail);
+        if (authUser?.uid) {
+          return authUser.uid;
+        }
+      } catch {
+        // Fallback to Firestore query if Auth lookup fails
+      }
+    }
+
+    if (adminDb && adminSdkCredentialsAvailable) {
+      try {
+        const snapLower = await adminDb
+          .collection("users")
+          .where("email", "==", cleanEmail)
+          .limit(1)
+          .get();
+        if (!snapLower.empty) {
+          return snapLower.docs[0].id;
+        }
+        const trimmedOriginal = String(rawEmail || "").trim();
+        if (trimmedOriginal !== cleanEmail) {
+          const snapExact = await adminDb
+            .collection("users")
+            .where("email", "==", trimmedOriginal)
+            .limit(1)
+            .get();
+          if (!snapExact.empty) {
+            return snapExact.docs[0].id;
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[Firestore Email Lookup Notice]: ${err?.message || err}`);
+      }
+    }
+
+    try {
+      const saToken = await getFirestoreServiceAccountToken();
+      if (saToken) {
+        const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents:runQuery?key=${FIREBASE_API_KEY}`;
+        const queryRes = await fetch(queryUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${saToken}`,
+          },
+          body: JSON.stringify({
+            structuredQuery: {
+              from: [{ collectionId: "users" }],
+              where: {
+                fieldFilter: {
+                  field: { fieldPath: "email" },
+                  op: "EQUAL",
+                  value: { stringValue: cleanEmail },
+                },
+              },
+              limit: 1,
+            },
+          }),
+        });
+        if (queryRes.ok) {
+          const rows: any = await queryRes.json();
+          const docName = rows?.[0]?.document?.name;
+          if (docName) {
+            const uid = String(docName).split("/").pop() || "";
+            if (uid) return uid;
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn(
+        `[Firestore REST Email Lookup Notice]: ${err?.message || err}`,
+      );
+    }
+
+    return null;
+  }
+
+  function isCryptomusGatewayActive(): boolean {
+    const merchantId = (CRYPTOMUS_MERCHANT_ID || "").trim();
+    const paymentKey = (process.env.CRYPTOMUS_PAYMENT_KEY || "").trim();
+    if (!merchantId || !paymentKey) return false;
+    const upper = `${merchantId} ${paymentKey}`.toUpperCase();
+    if (
+      upper.includes("PENDIENTE_DE_REVISION") ||
+      upper.includes("PENDIENTE") ||
+      upper.includes("AQUI_PONES") ||
+      upper.includes("YOUR_") ||
+      upper.includes("PLACEHOLDER")
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  // Gateway availability status endpoint for multi-gateway Upgrade Modal
+  app.get("/api/payments/gateway-status", (_req, res) => {
+    const mpPriceArs = Number(process.env.MP_PRO_PRICE_ARS) || 38000;
+    const mpToken = (process.env.MP_ACCESS_TOKEN || "").trim();
+    const mpActive =
+      Boolean(mpToken) &&
+      !mpToken.toUpperCase().includes("PENDIENTE") &&
+      !mpToken.toUpperCase().includes("YOUR_");
+    return res.json({
+      cryptomusActive: isCryptomusGatewayActive(),
+      mercadoPagoActive: mpActive,
+      mpProPriceArs: mpPriceArs,
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // MERCADO PAGO CHECKOUT PRO (ARS - ARGENTINA / LATAM) & WEBHOOK
+  // ---------------------------------------------------------------------------
+  app.post("/api/payments/mercadopago/create", async (req, res) => {
+    try {
+      const mpAccessToken = (process.env.MP_ACCESS_TOKEN || "").trim();
+      const mpProPriceArs = Number(process.env.MP_PRO_PRICE_ARS) || 38000;
+      const { userId, email } = req.body || {};
+
+      if (!userId || isGuestOrDemoUserId(userId)) {
+        return res.status(401).json({
+          status: "error",
+          error:
+            "Please sign in with your account before starting Mercado Pago checkout.",
+        });
+      }
+
+      if (!mpAccessToken || mpAccessToken.toUpperCase().includes("PENDIENTE")) {
+        return res.status(503).json({
+          status: "error",
+          error: "MP_ACCESS_TOKEN is not configured on the server.",
+        });
+      }
+
+      const cleanUserId = String(userId).trim();
+      const preferencePayload: Record<string, any> = {
+        items: [
+          {
+            id: "sentinel_pro_30d",
+            title: "Sentinel PRO (30 Days)",
+            description:
+              "Sentinel PRO 24/7 Quantitative Risk Monitor & Private Telegram Alerts (30 Days)",
+            quantity: 1,
+            currency_id: "ARS",
+            unit_price: mpProPriceArs,
+          },
+        ],
+        external_reference: cleanUserId,
+        notification_url:
+          "https://sentinelriskbot.com/api/webhooks/mercadopago",
+        back_urls: {
+          success: "https://sentinelriskbot.com/dashboard?payment=success",
+          failure: "https://sentinelriskbot.com/dashboard?payment=failure",
+          pending: "https://sentinelriskbot.com/dashboard?payment=pending",
+        },
+        auto_return: "approved",
+      };
+
+      if (email && String(email).includes("@")) {
+        preferencePayload.payer = { email: String(email).trim() };
+      }
+
+      const mpResponse = await fetch(
+        "https://api.mercadopago.com/checkout/preferences",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${mpAccessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(preferencePayload),
+        },
+      );
+
+      const mpData: any = await mpResponse.json();
+      if (!mpResponse.ok || !mpData?.init_point) {
+        console.warn(
+          "[Mercado Pago Preference Error]",
+          mpResponse.status,
+          mpData,
+        );
+        return res.status(502).json({
+          status: "error",
+          error:
+            mpData?.message ||
+            "Failed to create Mercado Pago checkout preference.",
+        });
+      }
+
+      console.log(
+        `[Mercado Pago Checkout Created] User: ${cleanUserId} | Price: $${mpProPriceArs} ARS | Pref ID: ${mpData.id}`,
+      );
+      return res.json({
+        checkoutUrl: mpData.init_point,
+        preferenceId: mpData.id,
+        priceArs: mpProPriceArs,
+      });
+    } catch (err: any) {
+      console.error("[Mercado Pago Create Exception]", err);
+      return res.status(500).json({
+        status: "error",
+        error: err?.message || "Failed to initialize Mercado Pago checkout",
+      });
+    }
+  });
+
+  app.post("/api/webhooks/mercadopago", async (req, res) => {
+    try {
+      const mpAccessToken = (process.env.MP_ACCESS_TOKEN || "").trim();
+      const queryDataId = req.query?.["data.id"] || req.query?.id;
+      const bodyDataId = req.body?.data?.id || req.body?.id;
+      const paymentId = bodyDataId || queryDataId;
+      const topicOrType = String(
+        req.body?.type ||
+          req.query?.type ||
+          req.query?.topic ||
+          req.body?.topic ||
+          "",
+      ).toLowerCase();
+      const action = String(req.body?.action || "").toLowerCase();
+      const isPaymentEvent =
+        !topicOrType ||
+        topicOrType === "payment" ||
+        action.startsWith("payment.");
+
+      if (isPaymentEvent && paymentId && mpAccessToken) {
+        const paymentRes = await fetch(
+          `https://api.mercadopago.com/v1/payments/${encodeURIComponent(String(paymentId))}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${mpAccessToken}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+
+        if (paymentRes.ok) {
+          const paymentData: any = await paymentRes.json();
+          const paymentStatus = String(paymentData?.status || "").toLowerCase();
+          const externalReference = String(
+            paymentData?.external_reference || "",
+          ).trim();
+
+          console.log(
+            `[Mercado Pago Webhook] Payment ID: ${paymentId} | Status: ${paymentStatus} | external_reference: ${externalReference}`,
+          );
+
+          if (
+            paymentStatus === "approved" &&
+            externalReference &&
+            !isGuestOrDemoUserId(externalReference)
+          ) {
+            await activateFirestoreProSubscription(
+              externalReference,
+              30,
+              undefined,
+              `mp_${paymentId}`,
+            );
+          }
+        } else {
+          console.warn(
+            `[Mercado Pago Webhook] Failed to fetch payment ${paymentId}: HTTP ${paymentRes.status}`,
+          );
+        }
+      }
+    } catch (err: any) {
+      console.error("[Mercado Pago Webhook Exception]", err?.message || err);
+    }
+
+    return res.status(200).json({ received: true });
+  });
+
+  // ---------------------------------------------------------------------------
+  // WHOP WEBHOOK (GLOBAL CARDS / APPLE PAY IN USD)
+  // ---------------------------------------------------------------------------
+  app.post("/api/webhooks/whop", async (req, res) => {
+    try {
+      const payload = req.body || {};
+      const rawEvent = String(
+        payload.action || payload.event || payload.type || "",
+      )
+        .trim()
+        .toLowerCase();
+
+      const isActivationEvent =
+        rawEvent === "payment.succeeded" ||
+        rawEvent === "membership.went_valid" ||
+        rawEvent === "payment_succeeded" ||
+        rawEvent === "membership_went_valid";
+
+      if (isActivationEvent) {
+        const data = payload.data || payload;
+        let userId = String(
+          data?.metadata?.uid ||
+            data?.metadata?.userId ||
+            data?.membership_metadata?.uid ||
+            data?.checkout_metadata?.uid ||
+            payload?.metadata?.uid ||
+            "",
+        ).trim();
+
+        const userEmail = String(
+          data?.user?.email ||
+            data?.email ||
+            data?.user_email ||
+            payload?.user?.email ||
+            "",
+        ).trim();
+
+        if ((!userId || isGuestOrDemoUserId(userId)) && userEmail) {
+          const resolvedUid = await resolveUserIdByEmail(userEmail);
+          if (resolvedUid) {
+            userId = resolvedUid;
+          }
+        }
+
+        console.log(
+          `[Whop Webhook] Event: ${rawEvent} | Resolved UID: ${userId || "N/A"} | Email: ${userEmail || "N/A"}`,
+        );
+
+        if (userId && !isGuestOrDemoUserId(userId)) {
+          await activateFirestoreProSubscription(
+            userId,
+            30,
+            undefined,
+            `whop_${data?.id || Date.now()}`,
+          );
+        } else {
+          console.warn(
+            `[Whop Webhook] Could not resolve a valid Firebase userId for event ${rawEvent}`,
+          );
+        }
+      }
+    } catch (err: any) {
+      console.error("[Whop Webhook Exception]", err?.message || err);
+    }
+
+    return res.status(200).json({ received: true });
+  });
+
   // 1. POST /api/payments/create-invoice - Generate Cryptomus Payment Invoice
   app.post("/api/payments/create-invoice", async (req, res) => {
     try {
       const paymentKey = process.env.CRYPTOMUS_PAYMENT_KEY || "";
-      const isPlaceholderCredentials =
-        !CRYPTOMUS_MERCHANT_ID ||
-        !paymentKey ||
-        CRYPTOMUS_MERCHANT_ID.includes("aqui_pones") ||
-        paymentKey.includes("aqui_pones") ||
-        CRYPTOMUS_MERCHANT_ID.includes("your_") ||
-        paymentKey.includes("your_");
+      const isPlaceholderCredentials = !isCryptomusGatewayActive();
 
       if (isPlaceholderCredentials) {
         return res.status(503).json({
           status: "error",
+          code: "PENDIENTE_DE_REVISION",
           error:
             "Live Cryptomus merchant credentials (CRYPTOMUS_MERCHANT_ID / CRYPTOMUS_PAYMENT_KEY) are pending activation. Replace the placeholder values in .env once your Cryptomus merchant KYC/KYB is approved.",
         });

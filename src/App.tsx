@@ -1,27 +1,31 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Lock, ArrowLeft, ShieldCheck, Crown, Terminal } from 'lucide-react';
-import { AlertTriggerConfig } from './types';
-import { Header } from './components/Header';
-import { CommandCenter } from './components/CommandCenter';
-import { LandingPage } from './components/LandingPage';
-import { LegalModals, LegalDocType } from './components/LegalModals';
-import { AuthModal } from './components/AuthModal';
-import { SubscriptionModal } from './components/SubscriptionModal';
-import { CheckoutModal } from './components/CheckoutModal';
-import { CryptoManagerModal } from './components/CryptoManagerModal';
-import { PaywallGate } from './components/PaywallGate';
-import { PWAInstallPrompt } from './components/PWAInstallPrompt';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { CryptoProvider, useCrypto } from './context/CryptoContext';
-import { MarketProvider, useMarket } from './context/MarketContext';
-import { VolatilityShieldProvider } from './context/VolatilityShieldContext';
-import { useLanguage } from './context/LanguageContext';
-import { playAlarmSound, getIsGlobalMuted, setGlobalMuted } from './utils/audioAlerts';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Lock, ArrowLeft, ShieldCheck, Crown, Terminal } from "lucide-react";
+import { AlertTriggerConfig } from "./types";
+import { Header } from "./components/Header";
+import { CommandCenter } from "./components/CommandCenter";
+import { LandingPage } from "./components/LandingPage";
+import { LegalModals, LegalDocType } from "./components/LegalModals";
+import { AuthModal } from "./components/AuthModal";
+import { SubscriptionModal } from "./components/SubscriptionModal";
+import { CheckoutModal } from "./components/CheckoutModal";
+import { CryptoManagerModal } from "./components/CryptoManagerModal";
+import { PaywallGate } from "./components/PaywallGate";
+import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { CryptoProvider, useCrypto } from "./context/CryptoContext";
+import { MarketProvider, useMarket } from "./context/MarketContext";
+import { VolatilityShieldProvider } from "./context/VolatilityShieldContext";
+import { useLanguage } from "./context/LanguageContext";
+import {
+  playAlarmSound,
+  getIsGlobalMuted,
+  setGlobalMuted,
+} from "./utils/audioAlerts";
 
 const DEFAULT_CONFIG: AlertTriggerConfig = {
-  symbol: 'BTCUSDT',
-  baseAsset: 'BTC',
-  quoteAsset: 'USDT',
+  symbol: "BTCUSDT",
+  baseAsset: "BTC",
+  quoteAsset: "USDT",
   slidingWindowSeconds: 300,
   sellVolumeZScoreThreshold: 2.5,
   sellVolumeRatioThreshold: 0.7,
@@ -29,42 +33,58 @@ const DEFAULT_CONFIG: AlertTriggerConfig = {
   wallChewThresholdPercent: 75,
   longLiquidationSpikeUsd: 500000,
   riskIndexAlertThreshold: 80,
-  webhookUrl: '/api/webhook-test',
-  telegramBotToken: '',
-  telegramChatId: '',
+  webhookUrl: "/api/webhook-test",
+  telegramBotToken: "",
+  telegramChatId: "",
   soundAlertsEnabled: true,
-  alarmSoundType: 'siren'
+  alarmSoundType: "siren",
 };
 
-function resolvePathname(): '/dashboard' | '/' {
-  if (typeof window === 'undefined') return '/';
+function resolvePathname(): "/dashboard" | "/" {
+  if (typeof window === "undefined") return "/";
   const raw = window.location.pathname.toLowerCase();
-  if (raw.startsWith('/dashboard')) {
-    return '/dashboard';
+  if (raw.startsWith("/dashboard")) {
+    return "/dashboard";
   }
-  return '/';
+  return "/";
 }
 
 function MainApp() {
   const [config, setConfig] = useState<AlertTriggerConfig>(DEFAULT_CONFIG);
-  const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => !getIsGlobalMuted());
-  const [currentRoute, setCurrentRoute] = useState<'/' | '/dashboard'>(resolvePathname);
-  const [guestSessionUnlocked, setGuestSessionUnlocked] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('sentinel_dashboard_session') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [soundEnabled, setSoundEnabledState] = useState<boolean>(
+    () => !getIsGlobalMuted(),
+  );
+  const [currentRoute, setCurrentRoute] = useState<"/" | "/dashboard">(
+    resolvePathname,
+  );
+  const [guestSessionUnlocked, setGuestSessionUnlocked] = useState<boolean>(
+    () => {
+      try {
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          if (
+            params.get("payment") === "success" ||
+            params.get("payment_status") === "success"
+          ) {
+            sessionStorage.setItem("sentinel_dashboard_session", "true");
+            return true;
+          }
+        }
+        return sessionStorage.getItem("sentinel_dashboard_session") === "true";
+      } catch {
+        return false;
+      }
+    },
+  );
   const [activeLegalDoc, setActiveLegalDoc] = useState<LegalDocType>(null);
 
-  const navigateTo = useCallback((path: '/' | '/dashboard') => {
-    if (typeof window !== 'undefined' && window.location.pathname !== path) {
-      window.history.pushState({}, '', path);
+  const navigateTo = useCallback((path: "/" | "/dashboard") => {
+    if (typeof window !== "undefined" && window.location.pathname !== path) {
+      window.history.pushState({}, "", path);
     }
     setCurrentRoute(path);
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, []);
 
@@ -72,8 +92,8 @@ function MainApp() {
     const handlePopState = () => {
       setCurrentRoute(resolvePathname());
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
   const setSoundEnabled = (enabled: boolean) => {
@@ -86,8 +106,12 @@ function MainApp() {
       const isMuted = e?.detail?.isMuted ?? getIsGlobalMuted();
       setSoundEnabledState(!isMuted);
     };
-    window.addEventListener('sentinel_audio_mute_toggle', handleMuteChange);
-    return () => window.removeEventListener('sentinel_audio_mute_toggle', handleMuteChange);
+    window.addEventListener("sentinel_audio_mute_toggle", handleMuteChange);
+    return () =>
+      window.removeEventListener(
+        "sentinel_audio_mute_toggle",
+        handleMuteChange,
+      );
   }, []);
 
   const { activeSymbol, setActiveSymbol, trackedSymbols } = useCrypto();
@@ -95,7 +119,7 @@ function MainApp() {
     activeMetrics: metrics,
     isConnected,
     globalRiskIndex,
-    isCrashWarningActive
+    isCrashWarningActive,
   } = useMarket();
 
   const { language, t } = useLanguage();
@@ -109,7 +133,7 @@ function MainApp() {
     openSubscriptionModal,
     isCheckoutModalOpen,
     closeCheckoutModal,
-    checkoutModalPlan
+    checkoutModalPlan,
   } = useAuth();
 
   const lastCrashAlertAtRef = useRef<number>(0);
@@ -117,52 +141,58 @@ function MainApp() {
   // Sync user's custom Watchlist (tracked_symbols) with /server.ts active Binance ingestion loop
   useEffect(() => {
     if (!Array.isArray(trackedSymbols) || trackedSymbols.length === 0) return;
-    fetch('/api/symbols/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    fetch("/api/symbols/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         symbols: trackedSymbols,
         tracked_symbols: trackedSymbols,
         userId: user?.uid || userProfile?.uid,
-        chatId: userProfile?.telegram_chat_id
-      })
-    }).catch((err) => console.warn('[Watchlist Sync Warning]', err));
-  }, [trackedSymbols, user?.uid, userProfile?.uid, userProfile?.telegram_chat_id]);
+        chatId: userProfile?.telegram_chat_id,
+      }),
+    }).catch((err) => console.warn("[Watchlist Sync Warning]", err));
+  }, [
+    trackedSymbols,
+    user?.uid,
+    userProfile?.uid,
+    userProfile?.telegram_chat_id,
+  ]);
 
   // Sync authenticated subscriber preferences (Chat ID, tracked_symbols, language_preference) to backend
   useEffect(() => {
     if (userProfile?.telegram_chat_id) {
-      const activeLang = language || userProfile.language_preference || 'es';
+      const activeLang = language || userProfile.language_preference || "es";
       const effectiveTracked =
         trackedSymbols.length > 0
           ? trackedSymbols
           : userProfile.tracked_symbols || [];
       (async () => {
         const idToken = user ? await user.getIdToken().catch(() => null) : null;
-        await fetch('/api/telegram/sync-subscriber', {
-          method: 'POST',
+        await fetch("/api/telegram/sync-subscriber", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {})
+            "Content-Type": "application/json",
+            ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
           },
           body: JSON.stringify({
             userId: userProfile.uid,
             chatId: userProfile.telegram_chat_id,
             telegramChatId: userProfile.telegram_chat_id,
-            subscriptionTier: userProfile.subscription_tier || (isPremium ? 'pro' : 'free'),
+            subscriptionTier:
+              userProfile.subscription_tier || (isPremium ? "pro" : "free"),
             tracked_symbols: effectiveTracked,
             trackedSymbols: effectiveTracked,
             languagePreference: activeLang,
-            language_preference: activeLang
-          })
+            language_preference: activeLang,
+          }),
         });
-      })().catch((err) => console.warn('[24/7 Sentinel Sync Error]', err));
+      })().catch((err) => console.warn("[24/7 Sentinel Sync Error]", err));
     }
   }, [user, userProfile, isPremium, language, trackedSymbols]);
 
   // Trigger audio alarm on critical Global Crash Shield activation when inside /dashboard
   useEffect(() => {
-    if (currentRoute !== '/dashboard') return;
+    if (currentRoute !== "/dashboard") return;
     const isCritical = isCrashWarningActive || globalRiskIndex >= 80;
     const now = Date.now();
     if (isCritical && now - lastCrashAlertAtRef.current > 60_000) {
@@ -170,9 +200,16 @@ function MainApp() {
       if (getIsGlobalMuted() || !soundEnabled || !config.soundAlertsEnabled) {
         return;
       }
-      playAlarmSound(config.alarmSoundType || 'siren');
+      playAlarmSound(config.alarmSoundType || "siren");
     }
-  }, [currentRoute, globalRiskIndex, isCrashWarningActive, soundEnabled, config.soundAlertsEnabled, config.alarmSoundType]);
+  }, [
+    currentRoute,
+    globalRiskIndex,
+    isCrashWarningActive,
+    soundEnabled,
+    config.soundAlertsEnabled,
+    config.alarmSoundType,
+  ]);
 
   const handleUpdateConfig = (newConfig: AlertTriggerConfig) => {
     setConfig(newConfig);
@@ -183,7 +220,7 @@ function MainApp() {
 
   const unlockGuestDashboardSession = () => {
     try {
-      sessionStorage.setItem('sentinel_dashboard_session', 'true');
+      sessionStorage.setItem("sentinel_dashboard_session", "true");
     } catch {
       // ignore storage errors
     }
@@ -192,19 +229,19 @@ function MainApp() {
 
   const handleNavigateToDashboard = () => {
     unlockGuestDashboardSession();
-    navigateTo('/dashboard');
+    navigateTo("/dashboard");
   };
 
   const handleGetProClick = () => {
     unlockGuestDashboardSession();
-    navigateTo('/dashboard');
+    navigateTo("/dashboard");
     openSubscriptionModal();
   };
 
   // ===========================================================================
   // PUBLIC ROOT ROUTE ("/"): CRYPTOMUS-COMPLIANT COMMERCIAL LANDING PAGE
   // ===========================================================================
-  if (currentRoute === '/') {
+  if (currentRoute === "/") {
     return (
       <>
         <PWAInstallPrompt />
@@ -246,11 +283,15 @@ function MainApp() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between text-xs font-mono text-[#848E9C]">
           <button
             type="button"
-            onClick={() => navigateTo('/')}
+            onClick={() => navigateTo("/")}
             className="inline-flex items-center gap-1.5 text-[#848E9C] hover:text-[#EAECEF] transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5 text-[#F0B90B]" />
-            <span>{language === 'es' ? 'Volver al Inicio de Sentinel' : 'Back to Sentinel Home'}</span>
+            <span>
+              {language === "es"
+                ? "Volver al Inicio de Sentinel"
+                : "Back to Sentinel Home"}
+            </span>
           </button>
           <span className="tabular-nums">Route: /dashboard</span>
         </div>
@@ -266,17 +307,19 @@ function MainApp() {
 
             <div className="space-y-2">
               <div className="text-xs font-mono text-[#F0B90B] uppercase tracking-wider">
-                {language === 'es' ? 'Ruta Ejecutiva Protegida (/dashboard)' : 'Protected Executive Route (/dashboard)'}
+                {language === "es"
+                  ? "Ruta Ejecutiva Protegida (/dashboard)"
+                  : "Protected Executive Route (/dashboard)"}
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-[#EAECEF]">
-                {language === 'es'
-                  ? 'Inicia Sesión para Acceder al Centro de Comando'
-                  : 'Sign In to Access Sentinel Command Center'}
+                {language === "es"
+                  ? "Inicia Sesión para Acceder al Centro de Comando"
+                  : "Sign In to Access Sentinel Command Center"}
               </h1>
               <p className="text-sm text-[#848E9C] leading-relaxed">
-                {language === 'es'
-                  ? 'Autentica tu cuenta para sincronizar tu Watchlist personalizada de Binance, el Bot de Alertas 24/7 en Telegram y los Planes de Ejecución ATR.'
-                  : 'Authenticate your account to synchronize your custom Binance Watchlist, 24/7 Telegram Alert Bot, and ATR Execution Plans.'}
+                {language === "es"
+                  ? "Autentica tu cuenta para sincronizar tu Watchlist personalizada de Binance, el Bot de Alertas 24/7 en Telegram y los Planes de Ejecución ATR."
+                  : "Authenticate your account to synchronize your custom Binance Watchlist, 24/7 Telegram Alert Bot, and ATR Execution Plans."}
               </p>
             </div>
 
@@ -284,13 +327,17 @@ function MainApp() {
               <button
                 type="button"
                 onClick={() => {
-                  setAuthModalMode('login');
+                  setAuthModalMode("login");
                   openAuthModal();
                 }}
                 className="w-full sm:w-auto px-5 py-3 rounded-xl bg-[#F0B90B] hover:bg-[#fcd535] text-slate-950 font-bold text-xs transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>{language === 'es' ? 'Iniciar Sesión / Crear Cuenta' : 'Sign In / Create Account'}</span>
+                <span>
+                  {language === "es"
+                    ? "Iniciar Sesión / Crear Cuenta"
+                    : "Sign In / Create Account"}
+                </span>
               </button>
 
               <button
@@ -301,7 +348,11 @@ function MainApp() {
                 className="w-full sm:w-auto px-5 py-3 rounded-xl bg-[#121418] hover:bg-[#2B2F36] text-[#F0B90B] border border-[#F0B90B]/40 font-bold text-xs transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 <Crown className="w-4 h-4" />
-                <span>{language === 'es' ? 'Obtener Sentinel PRO - $29/mes' : 'Get Sentinel PRO - $29/mo'}</span>
+                <span>
+                  {language === "es"
+                    ? "Obtener Sentinel PRO - $29/mes"
+                    : "Get Sentinel PRO - $29/mo"}
+                </span>
               </button>
             </div>
 
@@ -313,9 +364,9 @@ function MainApp() {
               >
                 <Terminal className="w-3.5 h-3.5" />
                 <span>
-                  {language === 'es'
-                    ? 'Continuar a la Vista Previa del Centro de Comando'
-                    : 'Continue to Live Command Center Preview'}
+                  {language === "es"
+                    ? "Continuar a la Vista Previa del Centro de Comando"
+                    : "Continue to Live Command Center Preview"}
                 </span>
               </button>
             </div>
@@ -352,9 +403,14 @@ function MainApp() {
       <footer className="border-t border-[#2B2F36] bg-[#0B0E11] py-5 text-xs font-mono text-[#848E9C]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-            <span className="text-[#EAECEF] font-semibold">Copyright © 2026 Sentinel.</span>
+            <span className="text-[#EAECEF] font-semibold">
+              Copyright © 2026 Sentinel.
+            </span>
             <span>·</span>
-            <a href="mailto:support@sentinelriskbot.com" className="text-[#F0B90B] hover:underline">
+            <a
+              href="mailto:support@sentinelriskbot.com"
+              className="text-[#F0B90B] hover:underline"
+            >
               support@sentinelriskbot.com
             </a>
           </div>
@@ -362,24 +418,26 @@ function MainApp() {
           <div className="flex flex-wrap items-center justify-center gap-4">
             <button
               type="button"
-              onClick={() => setActiveLegalDoc('terms')}
+              onClick={() => setActiveLegalDoc("terms")}
               className="hover:text-[#EAECEF] underline underline-offset-4 transition-colors"
             >
-              {language === 'es' ? 'Términos de Servicio' : 'Terms of Service'}
+              {language === "es" ? "Términos de Servicio" : "Terms of Service"}
             </button>
             <button
               type="button"
-              onClick={() => setActiveLegalDoc('privacy')}
+              onClick={() => setActiveLegalDoc("privacy")}
               className="hover:text-[#EAECEF] underline underline-offset-4 transition-colors"
             >
-              {language === 'es' ? 'Política de Privacidad' : 'Privacy Policy'}
+              {language === "es" ? "Política de Privacidad" : "Privacy Policy"}
             </button>
             <button
               type="button"
-              onClick={() => setActiveLegalDoc('refund')}
+              onClick={() => setActiveLegalDoc("refund")}
               className="hover:text-[#EAECEF] underline underline-offset-4 transition-colors"
             >
-              {language === 'es' ? 'Política de Reembolsos y Cancelación' : 'Refund & Cancellation Policy'}
+              {language === "es"
+                ? "Política de Reembolsos y Cancelación"
+                : "Refund & Cancellation Policy"}
             </button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   X,
   Crown,
@@ -7,10 +7,16 @@ import {
   Sparkles,
   ChevronRight,
   Coins,
-  Wallet
-} from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
+  Wallet,
+  CreditCard,
+  ExternalLink,
+  RefreshCw,
+  AlertCircle,
+  Globe,
+  Clock,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
 
 export const SubscriptionModal: React.FC = () => {
   const {
@@ -20,11 +26,11 @@ export const SubscriptionModal: React.FC = () => {
     openAuthModal,
     user,
     userProfile,
-    isPremium
+    isPremium,
   } = useAuth();
 
   const { language, t } = useLanguage();
-  const isEs = language === 'es';
+  const isEs = language === "es";
 
   const premiumFeatures = [
     { title: t.subFeature1Title, description: t.subFeature1Desc },
@@ -34,17 +40,123 @@ export const SubscriptionModal: React.FC = () => {
     { title: t.subFeature5Title, description: t.subFeature5Desc },
   ];
 
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'semiannual' | 'annual'>('annual');
+  const [selectedPlan, setSelectedPlan] = useState<
+    "monthly" | "semiannual" | "annual"
+  >("monthly");
+  const [cryptomusActive, setCryptomusActive] = useState<boolean>(() => {
+    const envStatus = String(
+      (import.meta as any).env?.VITE_CRYPTOMUS_STATUS || "",
+    ).toUpperCase();
+    if (envStatus.includes("PENDIENTE")) return false;
+    return false;
+  });
+  const [mpPriceArs, setMpPriceArs] = useState<number>(38000);
+  const [mpLoading, setMpLoading] = useState<boolean>(false);
+  const [gatewayError, setGatewayError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isSubscriptionModalOpen) return;
+    setGatewayError(null);
+    let cancelled = false;
+    fetch("/api/payments/gateway-status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const envStatus = String(
+          (import.meta as any).env?.VITE_CRYPTOMUS_STATUS || "",
+        ).toUpperCase();
+        if (envStatus.includes("PENDIENTE")) {
+          setCryptomusActive(false);
+        } else {
+          setCryptomusActive(Boolean(data.cryptomusActive));
+        }
+        if (Number(data.mpProPriceArs) > 0) {
+          setMpPriceArs(Number(data.mpProPriceArs));
+        }
+      })
+      .catch(() => {
+        // Keep safe defaults on network failure
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSubscriptionModalOpen]);
 
   if (!isSubscriptionModalOpen) return null;
 
-  const selectedPrice = selectedPlan === 'monthly' ? '29' : selectedPlan === 'semiannual' ? '149' : '249';
+  const selectedPrice =
+    selectedPlan === "monthly"
+      ? "29"
+      : selectedPlan === "semiannual"
+        ? "149"
+        : "249";
 
-  const handleCheckout = (e: React.FormEvent) => {
+  const rawWhopBaseUrl = String(
+    (import.meta as any).env?.VITE_WHOP_CHECKOUT_URL ||
+      "https://whop.com/checkout/sentinel-pro",
+  ).trim();
+  const userEmail = user?.email || userProfile?.email || "";
+  const userUid = user?.uid || "";
+  const whopSeparator = rawWhopBaseUrl.includes("?") ? "&" : "?";
+  const whopCheckoutUrl = userUid
+    ? `${rawWhopBaseUrl}${whopSeparator}email=${encodeURIComponent(userEmail)}&metadata[uid]=${encodeURIComponent(userUid)}`
+    : rawWhopBaseUrl;
+
+  const handleRequireAuth = () => {
+    closeSubscriptionModal();
+    openAuthModal();
+  };
+
+  const handleMercadoPagoCheckout = async () => {
+    if (!user || !user.uid) {
+      handleRequireAuth();
+      return;
+    }
+
+    setMpLoading(true);
+    setGatewayError(null);
+    try {
+      const idToken = await user.getIdToken().catch(() => null);
+      const res = await fetch("/api/payments/mercadopago/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({
+          userId: user.uid,
+          email: userEmail,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data?.checkoutUrl) {
+        throw new Error(
+          data?.error ||
+            (isEs
+              ? "No se pudo iniciar el checkout de Mercado Pago. Verifique la configuración o intente nuevamente."
+              : "Could not start Mercado Pago checkout. Please check configuration or try again."),
+        );
+      }
+
+      window.location.href = data.checkoutUrl;
+    } catch (err: any) {
+      setGatewayError(
+        err?.message ||
+          (isEs
+            ? "Error al conectar con Mercado Pago"
+            : "Error connecting to Mercado Pago"),
+      );
+    } finally {
+      setMpLoading(false);
+    }
+  };
+
+  const handleCryptomusCheckout = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!cryptomusActive) return;
     if (!user) {
-      closeSubscriptionModal();
-      openAuthModal();
+      handleRequireAuth();
       return;
     }
     closeSubscriptionModal();
@@ -53,8 +165,7 @@ export const SubscriptionModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn font-mono">
-      <div className="relative w-full max-w-2xl bg-[#121418] border border-[#2B2F36] rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-
+      <div className="relative w-full max-w-2xl bg-[#121418] border border-[#2B2F36] rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2B2F36] bg-[#181A20] flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -64,15 +175,15 @@ export const SubscriptionModal: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-extrabold text-[#EAECEF] uppercase tracking-wide">
-                  {isEs ? 'MEMBRESÍA SENTINEL PRO' : 'SENTINEL PRO MEMBERSHIP'}
+                  {isEs
+                    ? "OBTENER SENTINEL PRO ($29/MES)"
+                    : "GET SENTINEL PRO ($29/MO)"}
                 </h2>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/40">
-                  PRO
+                  PRO 24/7
                 </span>
               </div>
-              <p className="text-xs text-[#848E9C]">
-                {t.subModalSubtitle}
-              </p>
+              <p className="text-xs text-[#848E9C]">{t.subModalSubtitle}</p>
             </div>
           </div>
 
@@ -85,107 +196,280 @@ export const SubscriptionModal: React.FC = () => {
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
-
+        <div className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {/* Active Status Banner if already PRO */}
           {isPremium ? (
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
                   <ShieldCheck className="w-5 h-5" />
-                  <span>{isEs ? '¡MEMBRESÍA SENTINEL PRO ACTIVA!' : 'ACTIVE SENTINEL PRO MEMBERSHIP!'}</span>
+                  <span>
+                    {isEs
+                      ? "¡MEMBRESÍA SENTINEL PRO ACTIVA!"
+                      : "ACTIVE SENTINEL PRO MEMBERSHIP!"}
+                  </span>
                 </div>
                 <span className="text-[11px] text-[#848E9C]">
-                  {isEs ? 'Expiración:' : 'Expires:'}{' '}
+                  {isEs ? "Expiración:" : "Expires:"}{" "}
                   {userProfile?.subscription_expires_at
                     ? new Date(
-                        typeof userProfile.subscription_expires_at === 'number' || /^\d+$/.test(String(userProfile.subscription_expires_at))
+                        typeof userProfile.subscription_expires_at ===
+                          "number" ||
+                          /^\d+$/.test(
+                            String(userProfile.subscription_expires_at),
+                          )
                           ? Number(userProfile.subscription_expires_at)
-                          : String(userProfile.subscription_expires_at)
+                          : String(userProfile.subscription_expires_at),
                       ).toLocaleDateString()
-                    : 'N/A'}
+                    : "N/A"}
                 </span>
               </div>
-              <p className="text-xs text-[#EAECEF]">
-                {t.subModalActiveDesc}
-              </p>
+              <p className="text-xs text-[#EAECEF]">{t.subModalActiveDesc}</p>
             </div>
           ) : (
             <>
-              {/* Plan Selection Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-
-                {/* Monthly Plan ($29/mo) */}
-                <div
-                  onClick={() => setSelectedPlan('monthly')}
-                  className={`relative p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
-                    selectedPlan === 'monthly'
-                      ? 'bg-[#181A20] border-[#F0B90B] shadow-lg shadow-[#F0B90B]/10'
-                      : 'bg-[#121418] border-[#2B2F36] hover:border-[#848E9C]'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <span className="text-[10px] font-bold text-[#848E9C] uppercase">{isEs ? 'Plan Mensual' : 'Monthly Plan'}</span>
-                      <h3 className="text-xl font-extrabold text-[#EAECEF] font-mono mt-0.5">$29 <span className="text-[10px] text-[#848E9C] font-normal">/ mo</span></h3>
-                    </div>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPlan === 'monthly' ? 'border-[#F0B90B] bg-[#F0B90B] text-slate-950' : 'border-[#2B2F36]'}`}>
-                      {selectedPlan === 'monthly' && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
+              {/* Multi-Gateway Payment Section (3 Official Options) */}
+              <div className="p-4 sm:p-5 bg-[#0B0E11] rounded-xl border border-[#2B2F36] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#2B2F36] pb-3">
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-extrabold text-[#EAECEF] uppercase tracking-wider flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-[#0ECB81]" />
+                      <span>
+                        {isEs
+                          ? "Selecciona tu Método de Pago Instantáneo"
+                          : "Select Your Instant Payment Method"}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-[#848E9C] font-sans mt-0.5">
+                      {isEs
+                        ? "Activación automática de Sentinel PRO (30 días) al confirmarse el pago."
+                        : "Automatic 30-day Sentinel PRO activation immediately upon payment confirmation."}
+                    </p>
                   </div>
-                  <p className="text-[10px] text-[#848E9C]">{isEs ? 'Facturado mensualmente.' : 'Billed monthly.'}</p>
+                  <span className="self-start sm:self-center px-2.5 py-1 rounded-md text-[11px] font-extrabold bg-[#F0B90B]/15 text-[#F0B90B] border border-[#F0B90B]/40">
+                    $29 USD / {isEs ? "30 DÍAS" : "30 DAYS"}
+                  </span>
                 </div>
 
-                {/* Semi-Annual Plan ($149 / 6 mo) */}
-                <div
-                  onClick={() => setSelectedPlan('semiannual')}
-                  className={`relative p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
-                    selectedPlan === 'semiannual'
-                      ? 'bg-[#181A20] border-[#F0B90B] shadow-lg shadow-[#F0B90B]/10'
-                      : 'bg-[#121418] border-[#2B2F36] hover:border-[#848E9C]'
-                  }`}
-                >
-                  <div className="absolute -top-2 right-2 px-1.5 py-0.5 rounded-md bg-[#2B2F36] text-[#F0B90B] border border-[#F0B90B]/40 font-extrabold text-[8px] uppercase tracking-wider">
-                    {isEs ? 'AHORRA $25' : 'SAVE $25'}
+                {gatewayError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{gatewayError}</span>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {/* OPTION A: Whop — Card / Apple Pay (Global — $29 USD) */}
+                  <div className="p-3.5 bg-[#181A20] rounded-xl border border-[#F0B90B]/40 hover:border-[#F0B90B] transition space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-lg bg-[#F0B90B]/15 text-[#F0B90B] border border-[#F0B90B]/30">
+                          <CreditCard className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-extrabold text-[#EAECEF] flex items-center gap-2 flex-wrap">
+                            <span>
+                              {isEs
+                                ? "Tarjeta / Apple Pay (Global — $29 USD)"
+                                : "Card / Apple Pay (Global — $29 USD)"}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-[#0ECB81]/15 text-[#0ECB81] border border-[#0ECB81]/30 uppercase">
+                              {isEs ? "RECOMENDADO" : "INSTANT"}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#848E9C] font-sans mt-0.5">
+                            {isEs
+                              ? "Visa, Mastercard, Amex, Apple Pay y Google Pay vía Whop Checkout seguro."
+                              : "Visa, Mastercard, Amex, Apple Pay & Google Pay via secure Whop Checkout."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {user ? (
+                      <a
+                        href={whopCheckoutUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3 px-4 bg-gradient-to-r from-[#F0B90B] to-amber-500 hover:from-[#fcd535] hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-lg shadow-[#F0B90B]/20"
+                      >
+                        <Globe className="w-4 h-4" />
+                        <span>
+                          {isEs
+                            ? "PAGAR CON TARJETA / APPLE PAY ($29 USD)"
+                            : "PAY WITH CARD / APPLE PAY ($29 USD)"}
+                        </span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleRequireAuth}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-[#F0B90B] to-amber-500 hover:from-[#fcd535] hover:to-amber-400 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-lg shadow-[#F0B90B]/20"
+                      >
+                        <Globe className="w-4 h-4" />
+                        <span>
+                          {isEs
+                            ? "INICIAR SESIÓN Y PAGAR CON TARJETA / APPLE PAY ($29 USD)"
+                            : "SIGN IN & PAY WITH CARD / APPLE PAY ($29 USD)"}
+                        </span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
 
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <span className="text-[10px] font-bold text-[#F0B90B] uppercase">{isEs ? 'Semestral' : 'Semi-Annual'}</span>
-                      <h3 className="text-xl font-extrabold text-[#EAECEF] font-mono mt-0.5">$149 <span className="text-[10px] text-[#848E9C] font-normal">/ 6 mo</span></h3>
+                  {/* OPTION B: Mercado Pago (Argentina / ARS) */}
+                  <div className="p-3.5 bg-[#181A20] rounded-xl border border-sky-500/30 hover:border-sky-400/60 transition space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                          <Wallet className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-extrabold text-[#EAECEF] flex items-center gap-2 flex-wrap">
+                            <span>
+                              {isEs
+                                ? "Mercado Pago (Argentina / ARS)"
+                                : "Mercado Pago (Argentina / ARS)"}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                              ${mpPriceArs.toLocaleString("es-AR")} ARS
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#848E9C] font-sans mt-0.5">
+                            {isEs
+                              ? "Dinero en cuenta Mercado Pago, Tarjetas locales de Débito/Crédito en Pesos (Checkout Pro)."
+                              : "Mercado Pago wallet balance, local Argentine Debit & Credit cards in ARS (Checkout Pro)."}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPlan === 'semiannual' ? 'border-[#F0B90B] bg-[#F0B90B] text-slate-950' : 'border-[#2B2F36]'}`}>
-                      {selectedPlan === 'semiannual' && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleMercadoPagoCheckout}
+                      disabled={mpLoading}
+                      className="w-full py-3 px-4 bg-[#009EE3] hover:bg-[#008ACA] disabled:opacity-50 text-white font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-lg shadow-[#009EE3]/20"
+                    >
+                      {mpLoading ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>
+                            {isEs
+                              ? "CONECTANDO CON MERCADO PAGO..."
+                              : "REDIRECTING TO MERCADO PAGO..."}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Wallet className="w-4 h-4" />
+                          <span>
+                            {!user
+                              ? isEs
+                                ? `INICIAR SESIÓN Y PAGAR CON MERCADO PAGO ($${mpPriceArs.toLocaleString("es-AR")} ARS)`
+                                : `SIGN IN & PAY WITH MERCADO PAGO ($${mpPriceArs.toLocaleString("es-AR")} ARS)`
+                              : isEs
+                                ? `PAGAR CON MERCADO PAGO ($${mpPriceArs.toLocaleString("es-AR")} ARS)`
+                                : `PAY WITH MERCADO PAGO ($${mpPriceArs.toLocaleString("es-AR")} ARS)`}
+                          </span>
+                          <ChevronRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
                   </div>
-                  <p className="text-[10px] text-[#848E9C]">{isEs ? 'Equivale a $24.83/mes.' : 'Eq. to $24.83/mo.'}</p>
+
+                  {/* OPTION C: Crypto (USDT, BTC, ETH — Cryptomus) */}
+                  <form
+                    onSubmit={handleCryptomusCheckout}
+                    className="p-3.5 bg-[#181A20] rounded-xl border border-[#2B2F36] space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`p-2 rounded-lg border ${cryptomusActive ? "bg-[#F0B90B]/15 text-[#F0B90B] border-[#F0B90B]/30" : "bg-[#2B2F36]/50 text-[#848E9C] border-[#2B2F36]"}`}
+                        >
+                          <Coins className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-extrabold text-[#EAECEF] flex items-center gap-2 flex-wrap">
+                            <span>
+                              {isEs
+                                ? "Cripto (USDT, BTC, ETH — Cryptomus)"
+                                : "Crypto (USDT, BTC, ETH — Cryptomus)"}
+                            </span>
+                            {cryptomusActive ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/30">
+                                USDT • BTC • ETH • SOL
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                <span>
+                                  {isEs ? "Próximamente" : "Coming Soon"}
+                                </span>
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[#848E9C] font-sans mt-0.5">
+                            {cryptomusActive
+                              ? isEs
+                                ? "Paga en la blockchain con USDT (TRC-20 / BEP-20), Bitcoin, Ethereum o Solana."
+                                : "Pay on-chain with USDT (TRC-20 / BEP-20), Bitcoin, Ethereum, or Solana."
+                              : isEs
+                                ? "Pasarela cripto en verificación final de comercio. Usa Tarjeta/Apple Pay o Mercado Pago arriba para acceso inmediato."
+                                : "On-chain crypto gateway undergoing final merchant review. Use Card/Apple Pay or Mercado Pago above for instant access."}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {cryptomusActive ? (
+                      <button
+                        type="submit"
+                        className="w-full py-2.5 px-4 bg-[#2B2F36] hover:bg-[#F0B90B] text-[#EAECEF] hover:text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition"
+                      >
+                        <Coins className="w-4 h-4" />
+                        <span>
+                          {!user
+                            ? isEs
+                              ? `INICIAR SESIÓN Y PAGAR $${selectedPrice} CON CRIPTO`
+                              : `SIGN IN & PAY $${selectedPrice} WITH CRYPTO`
+                            : isEs
+                              ? `PAGAR $${selectedPrice} CON CRYPTOMUS (CRIPTO)`
+                              : `PAY $${selectedPrice} WITH CRYPTOMUS (CRYPTO)`}
+                        </span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full py-2.5 px-4 bg-[#121418] text-[#848E9C] border border-[#2B2F36] font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed opacity-75"
+                      >
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>
+                          {isEs
+                            ? "CRYPTOMUS CRIPTO — PRÓXIMAMENTE"
+                            : "CRYPTOMUS CRYPTO — COMING SOON"}
+                        </span>
+                      </button>
+                    )}
+                  </form>
                 </div>
 
-                {/* Annual Plan ($249 / yr - Best Value) */}
-                <div
-                  onClick={() => setSelectedPlan('annual')}
-                  className={`relative p-3.5 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
-                    selectedPlan === 'annual'
-                      ? 'bg-[#181A20] border-[#F0B90B] shadow-lg shadow-[#F0B90B]/10'
-                      : 'bg-[#121418] border-[#2B2F36] hover:border-[#848E9C]'
-                  }`}
-                >
-                  <div className="absolute -top-2 right-2 px-1.5 py-0.5 rounded-md bg-[#F0B90B] text-slate-950 font-extrabold text-[8px] uppercase tracking-wider">
-                    {isEs ? 'MEJOR VALOR • -$99' : 'BEST VALUE • -$99'}
-                  </div>
-
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <span className="text-[10px] font-bold text-[#F0B90B] uppercase">{isEs ? 'Plan Anual' : 'Annual Plan'}</span>
-                      <h3 className="text-xl font-extrabold text-[#EAECEF] font-mono mt-0.5">$249 <span className="text-[10px] text-[#848E9C] font-normal">/ yr</span></h3>
-                    </div>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${selectedPlan === 'annual' ? 'border-[#F0B90B] bg-[#F0B90B] text-slate-950' : 'border-[#2B2F36]'}`}>
-                      {selectedPlan === 'annual' && <Check className="w-3 h-3 stroke-[3]" />}
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-[#848E9C]">{isEs ? 'Equivale a $20.75/mes.' : 'Eq. to $20.75/mo.'}</p>
+                <div className="flex items-center justify-between text-[10px] text-[#848E9C] pt-1">
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    {isEs
+                      ? "Webhooks Oficiales Verificados"
+                      : "Verified Official Webhooks"}
+                  </span>
+                  <span>
+                    {isEs
+                      ? "Activación Automática PRO 24/7"
+                      : "Automatic 24/7 PRO Activation"}
+                  </span>
                 </div>
-
               </div>
 
               {/* Feature Comparison List */}
@@ -203,7 +487,7 @@ export const SubscriptionModal: React.FC = () => {
                     >
                       <Check
                         className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
-                          idx === 0 ? 'text-[#0ECB81]' : 'text-[#F0B90B]'
+                          idx === 0 ? "text-[#0ECB81]" : "text-[#F0B90B]"
                         }`}
                       />
                       <div className="space-y-0.5">
@@ -218,52 +502,8 @@ export const SubscriptionModal: React.FC = () => {
                   ))}
                 </div>
               </div>
-
-              {/* Verified Cryptomus Checkout Box */}
-              <form onSubmit={handleCheckout} className="p-4 bg-[#0B0E11] rounded-xl border border-[#2B2F36] space-y-4">
-                <div className="p-3.5 bg-[#181A20] rounded-xl border border-[#F0B90B]/30 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs font-bold text-[#EAECEF]">
-                      <Coins className="w-4 h-4 text-[#F0B90B]" />
-                      <span>{isEs ? 'Pasarela Cripto Verificada Cryptomus' : 'Verified Cryptomus Crypto Gateway'}</span>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#F0B90B]/20 text-[#F0B90B] border border-[#F0B90B]/30">
-                      USDT • BTC • ETH • SOL • TON
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#848E9C] leading-relaxed font-sans">
-                    {isEs
-                      ? 'Paga al instante con USDT (TRC-20 / BEP-20), Bitcoin, Ethereum, Solana o Toncoin. Tu acceso PRO se activa automáticamente al confirmarse el webhook firmado en la blockchain.'
-                      : 'Pay instantly with USDT (TRC-20 / BEP-20), Bitcoin, Ethereum, Solana, or Toncoin. PRO access activates automatically once the signed on-chain webhook confirms.'}
-                  </p>
-                </div>
-
-                <div className="pt-1">
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-gradient-to-r from-[#F0B90B] to-amber-500 hover:from-[#fcd535] hover:to-amber-400 active:opacity-90 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-xl shadow-[#F0B90B]/20"
-                  >
-                    <Wallet className="w-4 h-4" />
-                    <span>
-                      {!user
-                        ? (isEs ? `INICIAR SESIÓN Y PAGAR $${selectedPrice} CON CRYPTOMUS` : `SIGN IN & PAY $${selectedPrice} WITH CRYPTOMUS`)
-                        : (isEs ? `PAGAR $${selectedPrice} CON CRYPTOMUS (CRIPTO)` : `CONTINUE TO CRYPTOMUS CHECKOUT ($${selectedPrice})`)}
-                    </span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between text-[10px] text-[#848E9C] pt-1">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                    {isEs ? 'Verificación Criptográfica de Webhook' : 'Cryptographic Webhook Verification'}
-                  </span>
-                  <span>{isEs ? 'Activación Automática PRO' : 'Automatic PRO Activation'}</span>
-                </div>
-              </form>
             </>
           )}
-
         </div>
       </div>
     </div>
