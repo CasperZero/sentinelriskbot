@@ -67,8 +67,8 @@ export const PricingSection: React.FC = () => {
     {
       qEn: "What payment methods do you accept?",
       qEs: "¿Qué métodos de pago son aceptados?",
-      aEn: "We support all major Cryptocurrencies (USDT, BTC, ETH, SOL, TON, BNB) via the OxaPay decentralized gateway with instant on-chain webhook activation, as well as Credit/Debit cards via Whop and Mercado Pago.",
-      aEs: "Aceptamos las principales Criptomonedas (USDT TRC20/BEP20, BTC, ETH, SOL, TON, BNB) mediante la pasarela descentralizada OxaPay con activación instantánea en blockchain, además de tarjetas de crédito/débito con Whop y Mercado Pago.",
+      aEn: "We support direct non-custodial on-chain stablecoin payments (USDT & USDC on BNB Smart Chain BEP20, Polygon, and Arbitrum One) with instant TxHash verification, as well as Credit/Debit cards and Apple Pay via Whop and Mercado Pago.",
+      aEs: "Aceptamos pagos cripto directos on-chain sin intermediarios (USDT y USDC en BNB Smart Chain BEP20, Polygon y Arbitrum One) con verificación instantánea por TxHash, además de tarjetas de crédito/débito y Apple Pay mediante Whop y Mercado Pago.",
     },
     {
       qEn: "How does the Algorithmic Real-Time Alert system work for Premium users?",

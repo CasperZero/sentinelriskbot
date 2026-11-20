@@ -52,7 +52,7 @@ const LEGAL_COPY = {
         "Your Sentinel PRO membership grants an individual, non-transferable license to access the Command Center and link your personal Telegram Chat ID. Automated scraping, commercial reselling, or unauthorized forwarding of private PRO Telegram alerts to third-party channels is prohibited.",
       s4Title: "4. Subscription Billing & Cancellation",
       s4Body:
-        "Sentinel PRO is billed at $29.00 USD per 30-day cycle via OxaPay, Whop, or Mercado Pago. Subscriptions may be canceled at any time. Due to the instant digital nature of quantitative signals, we do not offer refunds for active billing periods.",
+        "Sentinel PRO is billed at $29.00 USD per 30-day cycle via Direct On-Chain Crypto (USDT/USDC), Whop, or Mercado Pago. Subscriptions may be canceled at any time. Due to the instant digital nature of quantitative signals, we do not offer refunds for active billing periods.",
     },
     privacy: {
       s1Title: "1. Minimal Data Storage & Purpose",
@@ -63,7 +63,7 @@ const LEGAL_COPY = {
         "Sentinel never sells, rents, trades, or shares your personal email, watchlist preferences, or Telegram identifiers with third-party advertisers, data brokers, or external marketers.",
       s3Title: "3. Cryptographic Payment & Account Security",
       s3BodyBeforeEmail:
-        "Subscription payments are processed externally through OxaPay, Whop, and Mercado Pago using cryptographically signed webhooks. Sentinel never stores private wallet keys, seed phrases, or payment card details. You may unlink your Telegram Chat ID at any time with one click in the dashboard or request complete account deletion by writing to ",
+        "Subscription payments are verified directly on-chain via Transaction Hash (TxHash) or processed externally through Whop and Mercado Pago using cryptographically verified webhooks. Sentinel never stores private wallet keys, seed phrases, or payment card details. You may unlink your Telegram Chat ID at any time with one click in the dashboard or request complete account deletion by writing to ",
       s3BodyAfterEmail: ".",
     },
   },
@@ -109,7 +109,7 @@ const LEGAL_COPY = {
         "Su suscripción a Sentinel PRO otorga una licencia personal e intransferible para acceder al Centro de Comando y vincular su Chat ID privado de Telegram. Queda prohibida la extracción automatizada (scraping), la reventa comercial o el reenvío no autorizado de señales privadas PRO a grupos públicos.",
       s4Title: "4. Facturación y Cancelación de Suscripciones",
       s4Body:
-        "Sentinel PRO tiene un costo de $29.00 USD por período de 30 días procesado mediante OxaPay, Whop o Mercado Pago. Las suscripciones pueden cancelarse en cualquier momento desde el panel. Debido a la naturaleza digital e instantánea de las señales cuantitativas, no se ofrecen reembolsos por períodos de facturación ya iniciados.",
+        "Sentinel PRO tiene un costo de $29.00 USD por período de 30 días procesado mediante Cripto Directo On-Chain (USDT/USDC), Whop o Mercado Pago. Las suscripciones pueden cancelarse en cualquier momento desde el panel. Debido a la naturaleza digital e instantánea de las señales cuantitativas, no se ofrecen reembolsos por períodos de facturación ya iniciados.",
     },
     privacy: {
       s1Title: "1. Almacenamiento Mínimo de Datos y Finalidad",
@@ -120,7 +120,7 @@ const LEGAL_COPY = {
         "Sentinel nunca vende, alquila, comercializa ni comparte su correo electrónico, preferencias de criptomonedas ni identificadores de Telegram con terceros, anunciantes o corredores de datos.",
       s3Title: "3. Seguridad Criptográfica en Pagos y Eliminación de Cuenta",
       s3BodyBeforeEmail:
-        "Los pagos de suscripción se procesan de forma segura a través de OxaPay, Whop y Mercado Pago mediante webhooks verificados criptográficamente. Sentinel nunca almacena claves privadas de billeteras, frases semilla ni números de tarjetas. Puede desvincular su cuenta de Telegram con un solo clic desde el panel o solicitar la eliminación total de sus datos escribiendo a ",
+        "Los pagos de suscripción se verifican directamente en la blockchain mediante Hash de Transacción (TxHash) o se procesan a través de Whop y Mercado Pago mediante webhooks verificados. Sentinel nunca almacena claves privadas de billeteras, frases semilla ni números de tarjetas. Puede desvincular su cuenta de Telegram con un solo clic desde el panel o solicitar la eliminación total de sus datos escribiendo a ",
       s3BodyAfterEmail: ".",
     },
   },

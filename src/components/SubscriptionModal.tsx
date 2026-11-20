@@ -3,6 +3,7 @@ import {
   X,
   Crown,
   Check,
+  Copy,
   ShieldCheck,
   Sparkles,
   ChevronRight,
@@ -12,10 +13,26 @@ import {
   ExternalLink,
   RefreshCw,
   AlertCircle,
+  AlertTriangle,
   Globe,
+  QrCode,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
+
+type CryptoNetworkId = "bsc" | "polygon" | "arbitrum";
+
+interface CryptoPaymentConfig {
+  enabled: boolean;
+  walletAddress: string;
+  priceUsd: number;
+  networks: Array<{
+    id: CryptoNetworkId;
+    label: string;
+    tokens: string[];
+  }>;
+}
 
 export const SubscriptionModal: React.FC = () => {
   const {
@@ -25,6 +42,7 @@ export const SubscriptionModal: React.FC = () => {
     user,
     userProfile,
     isPremium,
+    refreshUserProfile,
   } = useAuth();
 
   const { language, t } = useLanguage();
@@ -40,13 +58,40 @@ export const SubscriptionModal: React.FC = () => {
 
   const [mpPriceArs, setMpPriceArs] = useState<number>(38000);
   const [mpLoading, setMpLoading] = useState<boolean>(false);
-  const [oxaLoading, setOxaLoading] = useState<boolean>(false);
   const [gatewayError, setGatewayError] = useState<string | null>(null);
+
+  // Direct On-Chain Crypto State
+  const [cryptoConfig, setCryptoConfig] = useState<CryptoPaymentConfig>({
+    enabled: false,
+    walletAddress: "",
+    priceUsd: 29,
+    networks: [
+      { id: "bsc", label: "BNB Smart Chain (BEP20)", tokens: ["USDT", "USDC"] },
+      { id: "polygon", label: "Polygon", tokens: ["USDT", "USDC"] },
+      { id: "arbitrum", label: "Arbitrum One", tokens: ["USDT", "USDC"] },
+    ],
+  });
+  const [selectedNetwork, setSelectedNetwork] =
+    useState<CryptoNetworkId>("bsc");
+  const [txHashInput, setTxHashInput] = useState<string>("");
+  const [walletCopied, setWalletCopied] = useState<boolean>(false);
+  const [qrLoadError, setQrLoadError] = useState<boolean>(false);
+  const [verifyingCrypto, setVerifyingCrypto] = useState<boolean>(false);
+  const [cryptoError, setCryptoError] = useState<string | null>(null);
+  const [cryptoSuccessData, setCryptoSuccessData] = useState<{
+    network: string;
+    token: string;
+    amount: string;
+    txHash: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!isSubscriptionModalOpen) return;
     setGatewayError(null);
+    setCryptoError(null);
+    setCryptoSuccessData(null);
     let cancelled = false;
+
     fetch("/api/payments/gateway-status")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -58,6 +103,38 @@ export const SubscriptionModal: React.FC = () => {
       .catch(() => {
         // Keep safe defaults on network failure
       });
+
+    fetch("/api/payments/crypto/config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cfg) => {
+        if (cancelled || !cfg) return;
+        setCryptoConfig({
+          enabled: Boolean(cfg.enabled && cfg.walletAddress),
+          walletAddress: String(cfg.walletAddress || ""),
+          priceUsd: Number(cfg.priceUsd) || 29,
+          networks:
+            Array.isArray(cfg.networks) && cfg.networks.length > 0
+              ? cfg.networks
+              : [
+                  {
+                    id: "bsc",
+                    label: "BNB Smart Chain (BEP20)",
+                    tokens: ["USDT", "USDC"],
+                  },
+                  { id: "polygon", label: "Polygon", tokens: ["USDT", "USDC"] },
+                  {
+                    id: "arbitrum",
+                    label: "Arbitrum One",
+                    tokens: ["USDT", "USDC"],
+                  },
+                ],
+        });
+        setQrLoadError(false);
+      })
+      .catch(() => {
+        // Hide crypto option if config cannot be loaded
+      });
+
     return () => {
       cancelled = true;
     };
@@ -126,47 +203,184 @@ export const SubscriptionModal: React.FC = () => {
     }
   };
 
-  const handleOxaPayCheckout = async () => {
+  const handleCopyWalletAddress = () => {
+    if (!cryptoConfig.walletAddress) return;
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(cryptoConfig.walletAddress);
+      setWalletCopied(true);
+      setTimeout(() => setWalletCopied(false), 2500);
+    }
+  };
+
+  const formatLocalizedCryptoError = (
+    code?: string,
+    fallbackMsg?: string,
+    details?: any,
+  ): string => {
+    switch (code) {
+      case "invalid_tx_hash":
+        return isEs
+          ? "Formato de TxHash inválido. Pega un hash hexadecimal de 66 caracteres que comience con 0x."
+          : "Invalid TxHash format. Please paste a valid 66-character hexadecimal hash starting with 0x.";
+      case "tx_not_found_or_pending":
+      case "tx_pending_confirmations":
+        return isEs
+          ? "Transacción pendiente de confirmación en la blockchain (requiere al menos 2 bloques). Espera 15 segundos y vuelve a presionar Verificar Pago."
+          : "Transaction is still confirming on-chain (requires at least 2 confirmations). Please wait 15 seconds and click Verify Payment again.";
+      case "tx_failed":
+        return isEs
+          ? "La transacción falló o fue revertida en la blockchain. Por favor verifica tu envío."
+          : "This transaction failed or reverted on-chain. Please check your transfer.";
+      case "tx_too_old":
+        return isEs
+          ? "Esta transacción tiene más de 48 horas de antigüedad. Si necesitas ayuda, contacta a soporte."
+          : "This transaction is older than 48 hours. Please contact support if you need assistance.";
+      case "recipient_or_token_mismatch":
+        return isEs
+          ? "No se encontró una transferencia de USDT o USDC a la billetera oficial de Sentinel en la red seleccionada. Verifica haber elegido la misma red (BEP20, Polygon o Arbitrum)."
+          : "No USDT or USDC transfer to the official Sentinel wallet was found on the selected network. Please verify you selected the right network (BEP20, Polygon, or Arbitrum).";
+      case "insufficient_amount": {
+        const received = details?.receivedAmount;
+        const tok = details?.token || "USDT";
+        if (received) {
+          return isEs
+            ? `Monto recibido insuficiente (${received} ${tok}). Asegúrate de que lleguen al menos ${cryptoConfig.priceUsd} USDT/USDC después de la comisión de retiro.`
+            : `Insufficient amount received (${received} ${tok}). Please ensure at least ${cryptoConfig.priceUsd} USDT/USDC arrives after exchange withdrawal fees.`;
+        }
+        return isEs
+          ? `El monto recibido es menor a ${cryptoConfig.priceUsd} USDT/USDC. Asegúrate de cubrir la comisión de retiro de tu exchange.`
+          : `Transfer amount is below ${cryptoConfig.priceUsd} USDT/USDC. Please ensure exchange withdrawal fees are covered.`;
+      }
+      case "tx_already_claimed":
+        return isEs
+          ? "Este Hash de Transacción (TxHash) ya fue utilizado anteriormente para activar una suscripción."
+          : "This Transaction Hash (TxHash) has already been used to activate a subscription.";
+      case "rate_limited":
+        return isEs
+          ? "Demasiados intentos de verificación. Espera 1 minuto antes de volver a intentar."
+          : "Too many verification attempts. Please wait 1 minute before trying again.";
+      case "unauthorized":
+        return isEs
+          ? "Debes iniciar sesión en tu cuenta antes de verificar tu pago."
+          : "Please sign in to your account before verifying your payment.";
+      case "rpc_unreachable":
+        return isEs
+          ? "Conexión ocupada con el nodo RPC de la blockchain. Espera unos segundos y vuelve a presionar Verificar Pago."
+          : "Temporary blockchain RPC node timeout. Please wait a few seconds and click Verify Payment again.";
+      default:
+        return (
+          fallbackMsg ||
+          (isEs
+            ? "No se pudo verificar la transacción. Revisa la red seleccionada y el TxHash."
+            : "Could not verify transaction. Please check the selected network and TxHash.")
+        );
+    }
+  };
+
+  const handleVerifyCryptoPayment = async () => {
     if (!user || !user.uid) {
       handleRequireAuth();
       return;
     }
 
-    setOxaLoading(true);
-    setGatewayError(null);
+    const cleanHash = txHashInput.trim();
+    if (!/^0x[a-fA-F0-9]{64}$/.test(cleanHash)) {
+      setCryptoError(formatLocalizedCryptoError("invalid_tx_hash"));
+      return;
+    }
+
+    setVerifyingCrypto(true);
+    setCryptoError(null);
+
     try {
       const idToken = await user.getIdToken().catch(() => null);
-      const res = await fetch("/api/payments/oxapay/create", {
+      if (!idToken) {
+        setCryptoError(formatLocalizedCryptoError("unauthorized"));
+        setVerifyingCrypto(false);
+        return;
+      }
+
+      const res = await fetch("/api/payments/crypto/verify", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+          Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          network: selectedNetwork,
+          txHash: cleanHash,
+        }),
       });
 
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.paymentUrl) {
-        throw new Error(
-          data?.error ||
-            (isEs
-              ? "No se pudo generar la factura cripto con OxaPay. Por favor intente nuevamente."
-              : "Could not generate OxaPay crypto invoice. Please try again."),
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.success) {
+        const errCode =
+          data?.code ||
+          (res.status === 409
+            ? "tx_already_claimed"
+            : res.status === 429
+              ? "rate_limited"
+              : undefined);
+        setCryptoError(
+          formatLocalizedCryptoError(errCode, data?.error, data?.details),
         );
+        return;
       }
 
-      window.location.href = data.paymentUrl;
+      setCryptoSuccessData({
+        network: data.network,
+        token: data.token,
+        amount: data.amount,
+        txHash: data.txHash,
+      });
+      setTxHashInput("");
+
+      await refreshUserProfile(
+        Number(data.subscription_expires_at) ||
+          Date.now() + 30 * 24 * 60 * 60 * 1000,
+      );
     } catch (err: any) {
-      setGatewayError(
+      setCryptoError(
         err?.message ||
           (isEs
-            ? "Error al conectar con la pasarela cripto OxaPay"
-            : "Error connecting to OxaPay crypto gateway"),
+            ? "Error de red al verificar el pago en la blockchain. Intenta nuevamente."
+            : "Network error while verifying blockchain transaction. Please try again."),
       );
     } finally {
-      setOxaLoading(false);
+      setVerifyingCrypto(false);
     }
   };
+
+  const networkTabs: Array<{
+    id: CryptoNetworkId;
+    title: string;
+    badge?: string;
+    confirmTime: string;
+  }> = [
+    {
+      id: "bsc",
+      title: "BNB Smart Chain (BEP20)",
+      badge: isEs
+        ? "Comisión más baja / Recomendado"
+        : "Lowest fee / Recommended",
+      confirmTime: "~6s",
+    },
+    {
+      id: "polygon",
+      title: "Polygon",
+      confirmTime: "~5s",
+    },
+    {
+      id: "arbitrum",
+      title: "Arbitrum One",
+      confirmTime: "~3s",
+    },
+  ];
+
+  const activeNetworkLabel =
+    networkTabs.find((n) => n.id === selectedNetwork)?.title ||
+    "BNB Smart Chain (BEP20)";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn font-mono">
@@ -205,7 +419,7 @@ export const SubscriptionModal: React.FC = () => {
           {/* Active Status Banner if already PRO */}
           {isPremium ? (
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
                   <ShieldCheck className="w-5 h-5" />
                   <span>
@@ -229,11 +443,26 @@ export const SubscriptionModal: React.FC = () => {
                     : "N/A"}
                 </span>
               </div>
+              {cryptoSuccessData && (
+                <div className="p-3 rounded-lg bg-[#121418] border border-emerald-500/30 text-xs text-emerald-300 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>
+                      {isEs
+                        ? `Pago verificado en blockchain: ${cryptoSuccessData.amount} ${cryptoSuccessData.token} (${cryptoSuccessData.network.toUpperCase()})`
+                        : `On-chain payment verified: ${cryptoSuccessData.amount} ${cryptoSuccessData.token} (${cryptoSuccessData.network.toUpperCase()})`}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-[#848E9C] truncate">
+                    TxHash: {cryptoSuccessData.txHash}
+                  </div>
+                </div>
+              )}
               <p className="text-xs text-[#EAECEF]">{t.subModalActiveDesc}</p>
             </div>
           ) : (
             <>
-              {/* Multi-Gateway Payment Section (3 Official Options) */}
+              {/* Multi-Gateway Payment Section */}
               <div className="p-4 sm:p-5 bg-[#0B0E11] rounded-xl border border-[#2B2F36] space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#2B2F36] pb-3">
                   <div>
@@ -383,73 +612,259 @@ export const SubscriptionModal: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* OPTION C: Crypto (USDT / BTC / ETH — OxaPay) */}
-                  <div className="p-3.5 bg-[#181A20] rounded-xl border border-emerald-500/30 hover:border-emerald-400/60 transition space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          <Coins className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-extrabold text-[#EAECEF] flex items-center gap-2 flex-wrap">
-                            <span>
-                              {isEs
-                                ? "Cripto (USDT / BTC / ETH — OxaPay)"
-                                : "Crypto (USDT / BTC / ETH — OxaPay)"}
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                              USDT • BTC • ETH • SOL
-                            </span>
+                  {/* OPTION C: Direct On-Chain Crypto Verification (USDT / USDC via TxHash) */}
+                  {cryptoConfig.enabled && cryptoConfig.walletAddress && (
+                    <div className="p-4 bg-[#181A20] rounded-xl border border-emerald-500/40 space-y-4">
+                      {/* Panel Title */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            <Coins className="w-4 h-4" />
                           </div>
-                          <p className="text-[11px] text-[#848E9C] font-sans mt-0.5">
-                            {isEs
-                              ? "Paga al instante en la blockchain con USDT (TRC-20 / BEP-20 / Polygon), Bitcoin, Ethereum o Solana vía OxaPay."
-                              : "Pay instantly on-chain with USDT (TRC-20 / BEP-20 / Polygon), Bitcoin, Ethereum, or Solana via OxaPay."}
-                          </p>
+                          <div>
+                            <div className="text-xs font-extrabold text-[#EAECEF] flex items-center gap-2 flex-wrap">
+                              <span>
+                                {isEs
+                                  ? `Pago Cripto Directo On-Chain (${cryptoConfig.priceUsd} USDT / USDC)`
+                                  : `Direct On-Chain Crypto Payment (${cryptoConfig.priceUsd} USDT / USDC)`}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                {isEs
+                                  ? "VERIFICACIÓN POR TXHASH"
+                                  : "TXHASH VERIFIED"}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#848E9C] font-sans mt-0.5">
+                              {isEs
+                                ? "Sin intermediarios ni KYC. Envía USDT o USDC desde cualquier exchange o wallet y pega tu TxHash para activación inmediata."
+                                : "Non-custodial, zero middleman. Send USDT or USDC from any exchange or wallet and paste your TxHash for instant activation."}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <button
-                      type="button"
-                      onClick={handleOxaPayCheckout}
-                      disabled={oxaLoading}
-                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-500/20"
-                    >
-                      {oxaLoading ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
+                      {/* Step 1: Network Selector Pills */}
+                      <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-[#848E9C] uppercase tracking-wider block">
+                          {isEs
+                            ? "1. Selecciona la Red Blockchain"
+                            : "1. Select Blockchain Network"}
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {networkTabs.map((net) => {
+                            const isSelected = selectedNetwork === net.id;
+                            return (
+                              <button
+                                key={net.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedNetwork(net.id);
+                                  setCryptoError(null);
+                                }}
+                                className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
+                                  isSelected
+                                    ? "bg-[#F0B90B]/15 border-[#F0B90B] text-[#EAECEF] shadow-md shadow-[#F0B90B]/10"
+                                    : "bg-[#121418] border-[#2B2F36] hover:border-[#848E9C] text-[#848E9C]"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-[11px] font-extrabold text-[#EAECEF]">
+                                    {net.title}
+                                  </span>
+                                  <span
+                                    className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                                      isSelected
+                                        ? "bg-[#F0B90B]"
+                                        : "border border-[#848E9C]"
+                                    }`}
+                                  />
+                                </div>
+                                {net.badge ? (
+                                  <span className="mt-1.5 inline-block self-start px-1.5 py-0.5 rounded text-[9px] font-black bg-[#0ECB81]/15 text-[#0ECB81] border border-[#0ECB81]/30">
+                                    {net.badge}
+                                  </span>
+                                ) : (
+                                  <span className="mt-1.5 text-[10px] text-[#848E9C]">
+                                    USDT / USDC ({net.confirmTime})
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Step 2: Amount, Wallet Address & Scannable QR Code */}
+                      <div className="p-3.5 bg-[#121418] rounded-xl border border-[#2B2F36] space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2B2F36] pb-2.5">
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] text-[#848E9C] uppercase font-bold block">
+                              {isEs
+                                ? "Monto Exacto y Monedas Aceptadas:"
+                                : "Exact Amount & Accepted Tokens:"}
+                            </span>
+                            <div className="text-sm font-black text-[#F0B90B]">
+                              {cryptoConfig.priceUsd} USDT{" "}
+                              <span className="text-[#848E9C] font-normal">
+                                {isEs ? "o" : "or"}
+                              </span>{" "}
+                              {cryptoConfig.priceUsd} USDC
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] text-[#848E9C] uppercase font-bold block">
+                              {isEs ? "Red Seleccionada:" : "Selected Network:"}
+                            </span>
+                            <span className="text-xs font-extrabold text-emerald-400">
+                              {activeNetworkLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-center gap-3.5">
+                          {/* Scannable QR Code */}
+                          <div className="w-24 h-24 rounded-xl bg-white p-1.5 flex items-center justify-center flex-shrink-0 shadow-md">
+                            {!qrLoadError ? (
+                              <img
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data=${encodeURIComponent(
+                                  cryptoConfig.walletAddress,
+                                )}`}
+                                alt="Receiving Wallet QR Code"
+                                className="w-full h-full object-contain"
+                                onError={() => setQrLoadError(true)}
+                              />
+                            ) : (
+                              <QrCode className="w-16 h-16 text-slate-950" />
+                            )}
+                          </div>
+
+                          {/* Receiving 0x Address & One-Click Copy Button */}
+                          <div className="w-full min-w-0 flex-1 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-[#848E9C] uppercase">
+                                {isEs
+                                  ? "Dirección de Depósito (EVM 0x):"
+                                  : "Receiving Wallet Address (EVM 0x):"}
+                              </span>
+                              {walletCopied && (
+                                <span className="text-[10px] font-bold text-emerald-400">
+                                  {isEs
+                                    ? "¡Dirección copiada!"
+                                    : "Address copied!"}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 p-2 bg-[#0B0E11] rounded-lg border border-[#2B2F36]">
+                              <code className="text-[11px] font-mono text-[#EAECEF] break-all flex-1 select-all">
+                                {cryptoConfig.walletAddress}
+                              </code>
+                              <button
+                                type="button"
+                                onClick={handleCopyWalletAddress}
+                                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-extrabold transition flex items-center gap-1 flex-shrink-0 ${
+                                  walletCopied
+                                    ? "bg-emerald-500 text-slate-950"
+                                    : "bg-[#F0B90B] hover:bg-[#fcd535] text-slate-950"
+                                }`}
+                              >
+                                {walletCopied ? (
+                                  <>
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>{isEs ? "Copiado" : "Copied"}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span>{isEs ? "Copiar" : "Copy"}</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Network & Withdrawal Fee Warning */}
+                        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-[11px] text-amber-300 font-sans">
+                          <AlertTriangle className="w-4 h-4 text-[#F0B90B] flex-shrink-0 mt-0.5" />
                           <span>
                             {isEs
-                              ? "CONECTANDO CON OXAPAY..."
-                              : "REDIRECTING TO OXAPAY..."}
+                              ? `Importante: Selecciona exactamente la red ${activeNetworkLabel} al retirar desde tu exchange o wallet y asegúrate de que lleguen al menos ${cryptoConfig.priceUsd} USDT o USDC.`
+                              : `Important: Select the exact ${activeNetworkLabel} network when withdrawing from your exchange or wallet and ensure at least ${cryptoConfig.priceUsd} USDT or USDC arrives.`}
                           </span>
-                        </>
-                      ) : (
-                        <>
-                          <Coins className="w-4 h-4" />
-                          <span>
-                            {!user
-                              ? isEs
-                                ? "INICIAR SESIÓN Y PAGAR CON CRIPTO (USDT / BTC / ETH)"
-                                : "SIGN IN & PAY WITH CRYPTO (USDT / BTC / ETH)"
-                              : isEs
-                                ? "PAGAR CON CRIPTO (USDT / BTC / ETH)"
-                                : "PAY WITH CRYPTO (USDT / BTC / ETH)"}
-                          </span>
-                          <ChevronRight className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
-                  </div>
+                        </div>
+                      </div>
+
+                      {/* Step 3: Paste Transaction Hash (TxHash) & Verify Button */}
+                      <div className="space-y-2.5">
+                        <label className="text-[11px] font-bold text-[#848E9C] uppercase tracking-wider block">
+                          {isEs
+                            ? "2. Pega tu Hash de Transacción (TxHash) para Activar PRO"
+                            : "2. Paste Your Transaction Hash (TxHash) to Activate PRO"}
+                        </label>
+
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="text"
+                            value={txHashInput}
+                            onChange={(e) => {
+                              setTxHashInput(e.target.value);
+                              if (cryptoError) setCryptoError(null);
+                            }}
+                            placeholder="0x..."
+                            disabled={verifyingCrypto}
+                            className="flex-1 px-3 py-2.5 bg-[#0B0E11] border border-[#2B2F36] focus:border-[#F0B90B] focus:outline-none rounded-xl text-xs font-mono text-[#EAECEF] placeholder-[#848E9C]/50"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={handleVerifyCryptoPayment}
+                            disabled={verifyingCrypto}
+                            className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-black rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-500/20 flex-shrink-0"
+                          >
+                            {verifyingCrypto ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                <span>
+                                  {isEs
+                                    ? "VERIFICANDO ON-CHAIN..."
+                                    : "VERIFYING ON-CHAIN..."}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-4 h-4" />
+                                <span>
+                                  {!user
+                                    ? isEs
+                                      ? "INICIAR SESIÓN Y VERIFICAR"
+                                      : "SIGN IN & VERIFY"
+                                    : isEs
+                                      ? "VERIFICAR PAGO"
+                                      : "VERIFY PAYMENT"}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {cryptoError && (
+                          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-start gap-2 font-sans">
+                            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                            <span>{cryptoError}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between text-[10px] text-[#848E9C] pt-1">
                   <span className="flex items-center gap-1">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                     {isEs
-                      ? "Webhooks Oficiales Verificados"
-                      : "Verified Official Webhooks"}
+                      ? "Verificación On-Chain & Webhooks Oficiales"
+                      : "Direct On-Chain & Verified Webhooks"}
                   </span>
                   <span>
                     {isEs

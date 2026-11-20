@@ -49,7 +49,7 @@ const LANDING_COPY = {
     fomoBannerDesc:
       "Not PRO yet? Join our public Telegram channel (@SentinelFreeAlerts) to watch real-time signal teasers and verified TP1/TP2 wins 24/7.",
     fomoBannerCta: "Join Free Channel",
-    meta1: "Instant OxaPay & Card Activation",
+    meta1: "Instant On-Chain & Card Activation",
     meta2: "Non-Custodial (Zero Exchange Keys Required)",
     meta3: "Cancel Anytime",
     previewShieldTitle: "GLOBAL FLASH CRASH SHIELD",
@@ -139,7 +139,7 @@ const LANDING_COPY = {
     pricingKicker: "TRANSPARENT SAAS MEMBERSHIP",
     pricingTitle: "One Flat Monthly Rate. Full Institutional Access.",
     pricingSubtitle:
-      "Instant account activation via OxaPay, Whop, or Mercado Pago. No hidden tiers, no profit-sharing fees, and no exchange API keys required.",
+      "Instant account activation via Direct On-Chain Crypto (USDT/USDC), Whop, or Mercado Pago. No hidden tiers, no profit-sharing fees, and no exchange API keys required.",
     freePlanLabel: "OBSERVER PLAN",
     freePlanTitle: "Sentinel Free",
     freePlanUnit: "USD / month",
@@ -178,7 +178,7 @@ const LANDING_COPY = {
       },
     ],
     proGatewayNote:
-      "Secured by OxaPay, Whop & Mercado Pago (USDT, BTC, ETH, Cards)",
+      "Secured by Direct On-Chain Verification, Whop & Mercado Pago (USDT, USDC, Cards)",
     footerBrandDesc:
       "Quantitative cryptocurrency order-book risk monitoring, Flash Crash protection, and automated 24/7 Telegram execution alerts. Non-custodial analytical SaaS platform.",
     footerSupportLabel: "Support:",
@@ -220,7 +220,7 @@ const LANDING_COPY = {
     fomoBannerDesc:
       "¿Aún no eres PRO? Únete a nuestro canal público en Telegram (@SentinelFreeAlerts) para ver alertas en tiempo real y cierres ganadores TP1/TP2 verificados 24/7.",
     fomoBannerCta: "Unirse al Canal Gratuito",
-    meta1: "Activación Instantánea con OxaPay y Tarjeta",
+    meta1: "Activación Instantánea On-Chain y Tarjeta",
     meta2: "No Custodial (Sin Claves API de Exchanges)",
     meta3: "Cancela en Cualquier Momento",
     previewShieldTitle: "ESCUDO GLOBAL ANTI-CRASH",
@@ -316,7 +316,7 @@ const LANDING_COPY = {
     pricingKicker: "MEMBRESÍA SAAS TRANSPARENTE",
     pricingTitle: "Una Tarifa Mensual Fija. Acceso Institucional Completo.",
     pricingSubtitle:
-      "Activación instantánea mediante OxaPay, Whop o Mercado Pago. Sin niveles ocultos, sin comisiones sobre ganancias y sin pedir claves API de tus exchanges.",
+      "Activación instantánea mediante Cripto Directo On-Chain (USDT/USDC), Whop o Mercado Pago. Sin niveles ocultos, sin comisiones sobre ganancias y sin pedir claves API de tus exchanges.",
     freePlanLabel: "PLAN OBSERVADOR",
     freePlanTitle: "Sentinel Gratis",
     freePlanUnit: "USD / mes",
@@ -355,7 +355,7 @@ const LANDING_COPY = {
       },
     ],
     proGatewayNote:
-      "Pago seguro vía OxaPay, Whop y Mercado Pago (USDT, BTC, ETH, Tarjetas)",
+      "Pago seguro vía Verificación On-Chain Directa, Whop y Mercado Pago (USDT, USDC, Tarjetas)",
     footerBrandDesc:
       "Monitoreo cuantitativo de riesgo en libros de órdenes cripto, protección Anti-Crash y alertas automatizadas de ejecución 24/7 en Telegram. Plataforma SaaS analítica no custodial.",
     footerSupportLabel: "Soporte:",

@@ -45,6 +45,7 @@ interface AuthContextType {
   checkoutModalPlan: "monthly" | "semiannual" | "annual";
   isTelegramModalOpen: boolean;
   setIsTelegramModalOpen: (open: boolean) => void;
+  refreshUserProfile: (optimisticExpiresAt?: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -213,10 +214,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     plan: "monthly" | "semiannual" | "annual" = "monthly",
   ) => {
     // Client-side direct Firestore tier upgrades are disabled for security.
-    // Open the OxaPay checkout flow for verified server-side activation.
-    setIsSubscriptionModalOpen(false);
+    // Open the subscription modal for verified server-side activation.
     setCheckoutModalPlan(plan);
-    setIsCheckoutModalOpen(true);
+    setIsSubscriptionModalOpen(true);
+  };
+
+  const refreshUserProfile = async (optimisticExpiresAt?: number) => {
+    if (optimisticExpiresAt) {
+      setUserProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              subscription_tier: "pro",
+              payment_status: "active",
+              subscription_expires_at: optimisticExpiresAt,
+            }
+          : null,
+      );
+    }
+    if (user?.uid && user.uid !== "guest-demo-id") {
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (snap.exists()) {
+          const data = snap.data() as UserProfile;
+          if (optimisticExpiresAt && data.subscription_tier !== "pro") {
+            setUserProfile({
+              ...data,
+              subscription_tier: "pro",
+              payment_status: "active",
+              subscription_expires_at: optimisticExpiresAt,
+            });
+          } else {
+            setUserProfile(data);
+          }
+        }
+      } catch (e) {
+        console.warn("[Auth] refreshUserProfile notice:", e);
+      }
+    }
   };
 
   const downgradeToFree = async () => {
@@ -531,6 +566,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         checkoutModalPlan,
         isTelegramModalOpen,
         setIsTelegramModalOpen,
+        refreshUserProfile,
       }}
     >
       {children}

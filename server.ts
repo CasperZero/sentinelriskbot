@@ -17,6 +17,11 @@ import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import {
+  getCryptoPaymentEnvConfig,
+  verifyOnChainStablecoinPayment,
+  type SupportedCryptoNetworkId,
+} from "./cryptoVerifier";
 
 dotenv.config();
 
@@ -1882,13 +1887,12 @@ async function startServer() {
     return res.status(403).json({
       status: "error",
       error:
-        "Unverified client-side checkout is disabled. Please complete payment via Whop, Mercado Pago, or OxaPay.",
+        "Unverified client-side checkout is disabled. Please complete payment via Whop, Mercado Pago, or Direct On-Chain Crypto Verification.",
     });
   });
 
-  // In-memory idempotency set for processed payment orders / OxaPay track_ids
+  // In-memory idempotency set for processed payment orders
   const processedPaymentOrders = new Set<string>();
-  const processedOxapayTrackIds = new Set<string>();
 
   // Firebase Firestore Configuration & Safe Admin SDK Initialization
   const FIREBASE_PROJECT_ID =
@@ -2896,21 +2900,6 @@ async function startServer() {
     return null;
   }
 
-  function isOxaPayGatewayActive(): boolean {
-    const merchantKey = (process.env.OXAPAY_MERCHANT_API_KEY || "").trim();
-    if (!merchantKey) return false;
-    const upper = merchantKey.toUpperCase();
-    if (
-      upper.includes("PENDIENTE") ||
-      upper.includes("AQUI_PONES") ||
-      upper.includes("YOUR_") ||
-      upper.includes("PLACEHOLDER")
-    ) {
-      return false;
-    }
-    return true;
-  }
-
   // Helper: Authenticate logged-in Firebase user from Authorization Bearer token
   async function extractAuthenticatedUser(
     req: express.Request,
@@ -2974,10 +2963,10 @@ async function startServer() {
       Boolean(mpToken) &&
       !mpToken.toUpperCase().includes("PENDIENTE") &&
       !mpToken.toUpperCase().includes("YOUR_");
-    const oxaPriceUsd = Number(process.env.OXAPAY_PRO_PRICE_USD || 29);
+    const cryptoCfg = getCryptoPaymentEnvConfig();
     return res.json({
-      oxapayActive: isOxaPayGatewayActive(),
-      oxapayPriceUsd: oxaPriceUsd,
+      cryptoEnabled: cryptoCfg.enabled,
+      cryptoPriceUsd: cryptoCfg.priceUsd,
       mercadoPagoActive: mpActive,
       mpProPriceArs: mpPriceArs,
     });
@@ -3215,256 +3204,413 @@ async function startServer() {
   });
 
   // ---------------------------------------------------------------------------
-  // OXAPAY CRYPTO GATEWAY (API v1) — INVOICE CREATION & HMAC-SHA512 WEBHOOK
+  // DIRECT NON-CUSTODIAL ON-CHAIN CRYPTO PAYMENT VERIFIER (TxHash / EVM RPC)
   // ---------------------------------------------------------------------------
-  async function isOxaPayTrackIdAlreadyProcessed(
-    trackId: string,
+  interface ClaimedCryptoTxRecord {
+    txHash: string;
+    userId: string;
+    network: SupportedCryptoNetworkId;
+    tokenSymbol: "USDT" | "USDC";
+    amountUsd: number;
+    amount: string;
+    verifiedAt: number;
+  }
+
+  const CLAIMED_TX_FILE_PATH = path.resolve(
+    process.cwd(),
+    ".claimed_crypto_txs.json",
+  );
+  const claimedCryptoTxs = new Map<string, ClaimedCryptoTxRecord>();
+  const inFlightCryptoTxHashes = new Set<string>();
+
+  // Load persisted claimed txHashes from local disk on startup
+  try {
+    if (fs.existsSync(CLAIMED_TX_FILE_PATH)) {
+      const rawFile = fs.readFileSync(CLAIMED_TX_FILE_PATH, "utf8");
+      const parsedList = JSON.parse(rawFile);
+      if (Array.isArray(parsedList)) {
+        for (const item of parsedList) {
+          if (item && typeof item.txHash === "string") {
+            claimedCryptoTxs.set(item.txHash.toLowerCase(), item);
+          }
+        }
+      }
+    }
+  } catch (e: any) {
+    console.warn(
+      "[CryptoVerifier] Could not load .claimed_crypto_txs.json:",
+      e?.message || e,
+    );
+  }
+
+  function persistClaimedTxsToDisk(): void {
+    try {
+      const allRecords = Array.from(claimedCryptoTxs.values());
+      fs.writeFileSync(
+        CLAIMED_TX_FILE_PATH,
+        JSON.stringify(allRecords, null, 2),
+        "utf8",
+      );
+    } catch (e: any) {
+      console.warn(
+        "[CryptoVerifier] Could not write .claimed_crypto_txs.json:",
+        e?.message || e,
+      );
+    }
+  }
+
+  // Rate limiter: max 10 requests per 60 seconds per userId or IP
+  const cryptoVerifyRateBuckets = new Map<string, number[]>();
+  function checkCryptoVerifyRateLimit(key: string): boolean {
+    const now = Date.now();
+    const windowStart = now - 60_000;
+    const prev = cryptoVerifyRateBuckets.get(key) || [];
+    const recent = prev.filter((ts) => ts > windowStart);
+    if (recent.length >= 10) {
+      cryptoVerifyRateBuckets.set(key, recent);
+      return false;
+    }
+    recent.push(now);
+    cryptoVerifyRateBuckets.set(key, recent);
+    return true;
+  }
+
+  async function isCryptoTxAlreadyClaimed(
+    normalizedTxHash: string,
   ): Promise<boolean> {
-    if (!trackId) return false;
-    if (processedOxapayTrackIds.has(trackId)) return true;
+    if (claimedCryptoTxs.has(normalizedTxHash)) {
+      return true;
+    }
 
     if (adminDb && adminSdkCredentialsAvailable) {
       try {
         const snap = await adminDb
-          .collection("oxapay_webhooks")
-          .doc(trackId)
+          .collection("verified_crypto_txs")
+          .doc(normalizedTxHash)
           .get();
-        if (snap.exists && snap.data()?.processed === true) {
-          processedOxapayTrackIds.add(trackId);
+        if (snap.exists) {
+          const d = snap.data() as any;
+          claimedCryptoTxs.set(normalizedTxHash, {
+            txHash: normalizedTxHash,
+            userId: String(d?.userId || ""),
+            network: (d?.network as SupportedCryptoNetworkId) || "bsc",
+            tokenSymbol: d?.tokenSymbol === "USDC" ? "USDC" : "USDT",
+            amountUsd: Number(d?.amountUsd) || 29,
+            amount: String(d?.amount || "29.00"),
+            verifiedAt: Number(d?.verifiedAt) || Date.now(),
+          });
+          persistClaimedTxsToDisk();
           return true;
         }
       } catch {
-        // Fallback to in-memory tracking if Firestore check fails
+        // Fallback to REST / local storage check below
       }
     }
+
+    try {
+      const saToken = await getFirestoreServiceAccountToken();
+      const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/verified_crypto_txs/${encodeURIComponent(normalizedTxHash)}?key=${FIREBASE_API_KEY}`;
+      const headers: Record<string, string> = {};
+      if (saToken) headers["Authorization"] = `Bearer ${saToken}`;
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const docData: any = await res.json();
+        if (docData && docData.fields) {
+          claimedCryptoTxs.set(normalizedTxHash, {
+            txHash: normalizedTxHash,
+            userId: String(docData.fields.userId?.stringValue || ""),
+            network:
+              (docData.fields.network
+                ?.stringValue as SupportedCryptoNetworkId) || "bsc",
+            tokenSymbol:
+              docData.fields.tokenSymbol?.stringValue === "USDC"
+                ? "USDC"
+                : "USDT",
+            amountUsd: Number(
+              docData.fields.amountUsd?.doubleValue ??
+                docData.fields.amountUsd?.integerValue ??
+                29,
+            ),
+            amount: String(docData.fields.amount?.stringValue || "29.00"),
+            verifiedAt: Number(
+              docData.fields.verifiedAt?.integerValue || Date.now(),
+            ),
+          });
+          persistClaimedTxsToDisk();
+          return true;
+        }
+      }
+    } catch {
+      // Ignore REST check error
+    }
+
     return false;
   }
 
-  async function markOxaPayTrackIdProcessed(
-    trackId: string,
-    orderId: string,
-    userId: string,
-  ): Promise<void> {
-    if (!trackId) return;
-    processedOxapayTrackIds.add(trackId);
+  /**
+   * Atomically claims a verified txHash so concurrent or retried requests can NEVER double-activate PRO.
+   */
+  async function atomicallyClaimCryptoTx(
+    record: ClaimedCryptoTxRecord,
+  ): Promise<boolean> {
+    const normalizedTxHash = record.txHash.toLowerCase();
+    if (claimedCryptoTxs.has(normalizedTxHash)) {
+      return false;
+    }
 
     if (adminDb && adminSdkCredentialsAvailable) {
       try {
-        await adminDb.collection("oxapay_webhooks").doc(trackId).set(
-          {
-            track_id: trackId,
-            order_id: orderId,
-            user_id: userId,
-            processed: true,
-            processed_at: Date.now(),
-          },
-          { merge: true },
+        const docRef = adminDb
+          .collection("verified_crypto_txs")
+          .doc(normalizedTxHash);
+        const committed = await adminDb.runTransaction(async (tx) => {
+          const existing = await tx.get(docRef);
+          if (existing.exists) {
+            return false;
+          }
+          tx.create(docRef, {
+            txHash: normalizedTxHash,
+            userId: record.userId,
+            network: record.network,
+            tokenSymbol: record.tokenSymbol,
+            amountUsd: record.amountUsd,
+            amount: record.amount,
+            verifiedAt: record.verifiedAt,
+          });
+          return true;
+        });
+
+        if (!committed) {
+          return false;
+        }
+
+        claimedCryptoTxs.set(normalizedTxHash, record);
+        persistClaimedTxsToDisk();
+        return true;
+      } catch (err: any) {
+        // If transaction failed due to ALREADY_EXISTS (code 6), reject
+        if (
+          err?.code === 6 ||
+          String(err?.message || "").includes("ALREADY_EXISTS")
+        ) {
+          return false;
+        }
+        console.warn(
+          "[CryptoVerifier] Admin transaction fallback:",
+          err?.message || err,
         );
-      } catch {
-        // Ignore Firestore write error once in-memory set is updated
       }
     }
-  }
 
-  app.post("/api/payments/oxapay/create", async (req, res) => {
+    // Double-check local Map before locking
+    if (claimedCryptoTxs.has(normalizedTxHash)) {
+      return false;
+    }
+
+    claimedCryptoTxs.set(normalizedTxHash, record);
+    persistClaimedTxsToDisk();
+
+    // Also attempt to persist via Firestore REST API createDocument (fails with 409 if doc ID already exists)
     try {
-      const authUser = await extractAuthenticatedUser(req);
-      if (
-        !authUser ||
-        !authUser.userId ||
-        isGuestOrDemoUserId(authUser.userId)
-      ) {
-        return res.status(401).json({
-          status: "error",
-          error:
-            "Please sign in with your account before starting crypto checkout.",
-        });
-      }
-
-      const merchantApiKey = (process.env.OXAPAY_MERCHANT_API_KEY || "").trim();
-      if (!merchantApiKey) {
-        console.error(
-          "[OxaPay Create Invoice Error] OXAPAY_MERCHANT_API_KEY is not configured.",
-        );
-        return res.status(502).json({
-          status: "error",
-          error: "Crypto payment gateway is not configured on the server.",
-        });
-      }
-
-      const userId = authUser.userId;
-      const email = authUser.email;
-      const amount = Number(process.env.OXAPAY_PRO_PRICE_USD || 29);
-      const sandbox = process.env.OXAPAY_SANDBOX === "true";
-      const appUrl = (
-        process.env.PUBLIC_APP_URL || "https://sentinelriskbot.com"
-      ).replace(/\/+$/, "");
-      const orderId = `sentinel_${userId}_${Date.now()}`;
-
-      const oxapayPayload: Record<string, any> = {
-        amount,
-        currency: "USD",
-        lifetime: 60,
-        fee_paid_by_payer: 0,
-        under_paid_coverage: 2,
-        to_currency: "USDT",
-        mixed_payment: true,
-        callback_url: `${appUrl}/api/webhooks/oxapay`,
-        return_url: `${appUrl}/dashboard?payment=success`,
-        order_id: orderId,
-        description: "Sentinel PRO - 30 Days Access",
-        thanks_message:
-          "Payment received! Your Sentinel PRO access is activating now.",
-        sandbox,
-      };
-
-      if (email) {
-        oxapayPayload.email = email;
-      }
-
-      const response = await fetch(
-        "https://api.oxapay.com/v1/payment/invoice",
-        {
+      const saToken = await getFirestoreServiceAccountToken();
+      if (saToken) {
+        const createUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/${FIRESTORE_DATABASE_ID}/documents/verified_crypto_txs?documentId=${encodeURIComponent(normalizedTxHash)}&key=${FIREBASE_API_KEY}`;
+        const createRes = await fetch(createUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            merchant_api_key: merchantApiKey,
+            Authorization: `Bearer ${saToken}`,
           },
-          body: JSON.stringify(oxapayPayload),
-        },
-      );
-
-      const result: any = await response.json().catch(() => null);
-      if (
-        !response.ok ||
-        result?.status !== 200 ||
-        !result?.data?.payment_url
-      ) {
-        console.error("[OxaPay Create Invoice Error]", {
-          httpStatus: response.status,
-          result,
+          body: JSON.stringify({
+            fields: {
+              txHash: { stringValue: normalizedTxHash },
+              userId: { stringValue: record.userId },
+              network: { stringValue: record.network },
+              tokenSymbol: { stringValue: record.tokenSymbol },
+              amountUsd: { doubleValue: record.amountUsd },
+              amount: { stringValue: record.amount },
+              verifiedAt: { integerValue: String(record.verifiedAt) },
+            },
+          }),
         });
-        return res.status(502).json({
-          status: "error",
-          error:
-            result?.message ||
-            "Failed to generate crypto payment invoice with OxaPay.",
-        });
+        if (createRes.status === 409) {
+          return false;
+        }
       }
-
-      console.log(
-        `[OxaPay Invoice Created] User: ${userId} | Order: ${orderId} | TrackId: ${result.data.track_id} | Amount: $${amount} USD`,
-      );
-
-      return res.json({
-        paymentUrl: result.data.payment_url,
-        trackId: result.data.track_id,
-        orderId,
-      });
-    } catch (err: any) {
-      console.error("[OxaPay Create Exception]", err);
-      return res.status(502).json({
-        status: "error",
-        error: err?.message || "Failed to initialize OxaPay checkout",
-      });
+    } catch {
+      // Local disk + memory map already locked this txHash
     }
+
+    return true;
+  }
+
+  app.get("/api/payments/crypto/config", (_req, res) => {
+    const cfg = getCryptoPaymentEnvConfig();
+    return res.json({
+      enabled: cfg.enabled,
+      walletAddress: cfg.walletAddress,
+      priceUsd: cfg.priceUsd,
+      networks: cfg.networks,
+    });
   });
 
-  app.post("/api/webhooks/oxapay", async (req, res) => {
+  app.post("/api/payments/crypto/verify", async (req, res) => {
+    const authUser = await extractAuthenticatedUser(req);
+    if (!authUser || !authUser.userId || isGuestOrDemoUserId(authUser.userId)) {
+      return res.status(401).json({
+        status: "error",
+        code: "unauthorized",
+        error:
+          "Please sign in with your account before verifying a crypto payment.",
+      });
+    }
+
+    const userId = authUser.userId;
+    const clientIp = String(
+      req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "unknown",
+    )
+      .split(",")[0]
+      .trim();
+
+    if (
+      !checkCryptoVerifyRateLimit(`user:${userId}`) ||
+      !checkCryptoVerifyRateLimit(`ip:${clientIp}`)
+    ) {
+      return res.status(429).json({
+        status: "error",
+        code: "rate_limited",
+        error:
+          "Too many verification attempts. Please wait 1 minute before trying again.",
+      });
+    }
+
+    const rawNetwork = String(req.body?.network || "")
+      .trim()
+      .toLowerCase();
+    const rawTxHash = String(req.body?.txHash || "").trim();
+
+    if (
+      rawNetwork !== "bsc" &&
+      rawNetwork !== "polygon" &&
+      rawNetwork !== "arbitrum"
+    ) {
+      return res.status(400).json({
+        status: "error",
+        code: "invalid_network",
+        error:
+          "Invalid network. Supported networks are bsc, polygon, and arbitrum.",
+      });
+    }
+
+    if (!/^0x[a-fA-F0-9]{64}$/.test(rawTxHash)) {
+      return res.status(400).json({
+        status: "error",
+        code: "invalid_tx_hash",
+        error:
+          "Invalid Transaction Hash format. Expected a 66-character hex string starting with 0x.",
+      });
+    }
+
+    const network = rawNetwork as SupportedCryptoNetworkId;
+    const normalizedTxHash = rawTxHash.toLowerCase();
+
+    // Prevent concurrent verification of the same txHash
+    if (inFlightCryptoTxHashes.has(normalizedTxHash)) {
+      return res.status(409).json({
+        status: "error",
+        code: "tx_already_claimed",
+        error:
+          "This transaction hash is currently being verified or has already been claimed.",
+      });
+    }
+
+    inFlightCryptoTxHashes.add(normalizedTxHash);
+
     try {
-      const merchantApiKey = (process.env.OXAPAY_MERCHANT_API_KEY || "").trim();
-      const headerHmac =
-        typeof req.headers["hmac"] === "string"
-          ? req.headers["hmac"].trim()
-          : "";
-      const rawBody =
-        typeof (req as any).rawBody === "string" ? (req as any).rawBody : "";
-
-      if (!merchantApiKey || !headerHmac || !rawBody) {
-        console.warn(
-          "[OxaPay Webhook] Rejected request: missing merchant key, hmac header, or rawBody.",
-        );
-        return res.status(401).json({ error: "Invalid HMAC signature" });
+      // 1. Check if txHash was already claimed BEFORE calling blockchain RPCs
+      if (await isCryptoTxAlreadyClaimed(normalizedTxHash)) {
+        return res.status(409).json({
+          status: "error",
+          code: "tx_already_claimed",
+          error:
+            "This transaction hash has already been used to activate a Sentinel PRO subscription.",
+        });
       }
 
-      const computedHmac = crypto
-        .createHmac("sha512", merchantApiKey)
-        .update(rawBody)
-        .digest("hex")
-        .toLowerCase();
-      const incomingHmac = headerHmac.toLowerCase();
+      // 2. Verify transaction on-chain via JSON-RPC + BigInt
+      const verifyResult = await verifyOnChainStablecoinPayment({
+        network,
+        txHash: normalizedTxHash,
+      });
 
-      const computedBuf = Buffer.from(computedHmac, "utf8");
-      const incomingBuf = Buffer.from(incomingHmac, "utf8");
-
-      if (
-        computedBuf.length !== incomingBuf.length ||
-        !crypto.timingSafeEqual(computedBuf, incomingBuf)
-      ) {
-        console.warn(
-          "[OxaPay Webhook] Rejected request: HMAC signature mismatch.",
-        );
-        return res.status(401).json({ error: "Invalid HMAC signature" });
+      if (!verifyResult.ok) {
+        const failure = verifyResult as {
+          ok: false;
+          code: string;
+          error: string;
+          details?: Record<string, any>;
+        };
+        const httpStatus = failure.code === "wallet_not_configured" ? 503 : 400;
+        return res.status(httpStatus).json({
+          status: "error",
+          code: failure.code,
+          error: failure.error,
+          details: failure.details,
+        });
       }
 
-      const payload = req.body || {};
-      const trackId = String(payload.track_id || "").trim();
-      const orderId = String(payload.order_id || "").trim();
-      const status = String(payload.status || "").trim();
+      // 3. Atomically record the claimed txHash before activating PRO
+      const claimRecord: ClaimedCryptoTxRecord = {
+        txHash: normalizedTxHash,
+        userId,
+        network: verifyResult.network,
+        tokenSymbol: verifyResult.token,
+        amountUsd: verifyResult.amountUsd,
+        amount: verifyResult.amount,
+        verifiedAt: Date.now(),
+      };
 
-      console.log(
-        `[OxaPay Webhook] track_id: ${trackId || "N/A"} | order_id: ${orderId || "N/A"} | status: ${status || "N/A"}`,
+      const claimed = await atomicallyClaimCryptoTx(claimRecord);
+      if (!claimed) {
+        return res.status(409).json({
+          status: "error",
+          code: "tx_already_claimed",
+          error: "This transaction hash has already been claimed.",
+        });
+      }
+
+      // 4. Activate 30-day PRO subscription using the shared activation function
+      const orderRef = `crypto_${network}_${normalizedTxHash}`;
+      const activation = await activateFirestoreProSubscription(
+        userId,
+        30,
+        req.headers.authorization,
+        orderRef,
       );
 
-      if (status.toLowerCase() === "paid") {
-        // Extract userId from sentinel_<userId>_<timestamp> (preserving underscores inside userId)
-        let userId = "";
-        if (orderId.startsWith("sentinel_")) {
-          const withoutPrefix = orderId.slice("sentinel_".length);
-          const lastUnderscoreIdx = withoutPrefix.lastIndexOf("_");
-          if (lastUnderscoreIdx > 0) {
-            userId = withoutPrefix.slice(0, lastUnderscoreIdx).trim();
-          }
-        }
+      console.log(
+        `[On-Chain Crypto Payment Verified] User: ${userId} | Network: ${network} | Token: ${verifyResult.token} | Amount: ${verifyResult.amount} | TxHash: ${normalizedTxHash}`,
+      );
 
-        if (!userId || isGuestOrDemoUserId(userId)) {
-          console.warn(
-            `[OxaPay Webhook] Could not extract a valid userId from order_id: ${orderId}`,
-          );
-          return res.status(200).send("ok");
-        }
-
-        // Idempotency guard on track_id so retried webhooks never double-activate or double-extend
-        if (trackId && (await isOxaPayTrackIdAlreadyProcessed(trackId))) {
-          console.log(
-            `[OxaPay Webhook] Duplicate track_id ${trackId} ignored (already processed).`,
-          );
-          return res.status(200).send("ok");
-        }
-
-        const orderRef = trackId ? `oxapay_${trackId}` : `oxapay_${orderId}`;
-        if (processedPaymentOrders.has(`${userId}:${orderRef}`)) {
-          console.log(
-            `[OxaPay Webhook] Duplicate order reference ${orderRef} for user ${userId} ignored.`,
-          );
-          return res.status(200).send("ok");
-        }
-
-        const activation = await activateFirestoreProSubscription(
-          userId,
-          30,
-          undefined,
-          orderRef,
-        );
-        if (activation.ok && trackId) {
-          await markOxaPayTrackIdProcessed(trackId, orderId, userId);
-        }
-      }
-
-      return res.status(200).send("ok");
+      return res.status(200).json({
+        success: true,
+        network: verifyResult.network,
+        token: verifyResult.token,
+        amount: verifyResult.amount,
+        txHash: normalizedTxHash,
+        subscription_tier: "pro",
+        payment_status: "active",
+        subscription_expires_at: activation.subscription_expires_at,
+      });
     } catch (err: any) {
-      console.error("[OxaPay Webhook Exception]", err?.message || err);
-      return res.status(200).send("ok");
+      console.error("[Crypto Verify Endpoint Exception]", err?.message || err);
+      return res.status(500).json({
+        status: "error",
+        code: "internal_error",
+        error: err?.message || "Failed to verify crypto transaction.",
+      });
+    } finally {
+      inFlightCryptoTxHashes.delete(normalizedTxHash);
     }
   });
 
